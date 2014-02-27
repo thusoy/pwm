@@ -43,7 +43,7 @@ class DomainPassword(Base):
 
 
     def derive_domain_key(self, master_password):
-        bytes = ('%s:%s' % (master_password, self.domain)).encode('utf8')
+        bytes = ('%s:%s:%s' % (master_password, self.domain, self.salt)).encode('utf8')
         key = hashlib.sha1(bytes).hexdigest()
         return key
 
