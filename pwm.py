@@ -82,8 +82,9 @@ class PWM(object):
 
     def __init__(self, config_file=None):
         if not os.path.exists(config_file):
-            os.makedirs(os.path.dirname(config_file))
-            self.run_setup()
+            if not os.path.exists(os.path.dirname(config_file)):
+                os.makedirs(os.path.dirname(config_file))
+            self.run_setup(config_file)
         self.read_config(config_file)
 
 
@@ -110,12 +111,12 @@ class PWM(object):
         self.config = config
 
 
-    def run_setup(self):
+    def run_setup(self, config_file):
         print(textwrap.dedent("""\
             Hi, it looks like it's the first time you're using pwm on this machine. Let's take a little
             moment to set things up before we begin."""))
-        db_uri = input('Which database do you want to use? Default: local') or 'local'
-        rc_dir = os.path.join(os.path.expanduser('~'), '.pwm')
+        db_uri = input('Which database do you want to use (default: local sqlite at ~/.pwm/db.sqlite) ').strip() or 'local'
+        rc_dir = os.path.dirname(config_file)
 
         if db_uri == 'local':
 
@@ -124,15 +125,21 @@ class PWM(object):
 
             # Create the local database
             db_uri = 'sqlite:///%s/db.sqlite' % rc_dir
+        if not '://' in db_uri:
+            # Not a sqlalchemy-compatible connection string or https URI, assume it's a local path and make a sqlite
+            # uri out of it
+            db_uri = 'sqlite:///%s' % db_uri
+        if not (db_uri.startswith('https:') or db_uri.startswith('http:')):
+            # It's a local db, make sure our tables exist
             db = sa.create_engine(db_uri)
             Base.metadata.create_all(db)
 
-        config = RawConfigParser()
-        config.add_section('pwm')
-        config.set('pwm', 'database', db_uri)
+        config_parser = RawConfigParser()
+        config_parser.add_section('pwm')
+        config_parser.set('pwm', 'database', db_uri)
 
-        with open(os.path.join(rc_dir, 'config'), 'w') as configfile:
-            config.write(configfile)
+        with open(config_file, 'w') as config_file_fh:
+            config_parser.write(config_file_fh)
 
 
     def get_domain_salt(self, domain):
@@ -176,7 +183,7 @@ class PWM(object):
         return domain_password
 
 
-    def get_salt(session, domain):
+    def get_salt(self, session, domain):
         domain_password = session.query(DomainPassword).filter(DomainPassword.domain == domain).first()
         if domain_password is None:
             domain_password = DomainPassword(domain=domain)
