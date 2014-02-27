@@ -1,4 +1,5 @@
 import argparse
+import base64
 import getpass
 import hashlib
 import logging.config
@@ -39,7 +40,7 @@ class Domain(Base):
 
 
     def new_salt(self):
-        self.salt = os.urandom(128).encode('base64')
+        self.salt = base64.b64encode(os.urandom(128))
 
 
     def derive_key(self, master_password):

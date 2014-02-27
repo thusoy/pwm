@@ -15,7 +15,7 @@ class PWMTest(unittest.TestCase):
         self.tmp_config.write(textwrap.dedent("""\
         [pwm]
         database = sqlite://
-        """))
+        """).encode('utf-8'))
         self.tmp_config.close()
         db = sa.create_engine('sqlite://')
         pwm.Base.metadata.create_all(db)
