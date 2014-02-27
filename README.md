@@ -7,8 +7,35 @@ Most password managers use a master password to keep your site-specific password
 
 So what does pwm do differently? Instead of storing your passwords, it stores some random bytes (often known as a salt) for each of your sites, and when you want to get the access key for a site you simply enter your master password and an identifier for the site (such as the domain, mybank.com or similar), and pwm will generate a key for you to use as a password on that site, without storing it anywhere. Thus, if your database is lost, all that's present in the database is a random string that's without value without your master password.
 
+Usage
+-----
+
+    $ pwm mybank.com
+    Enter your master password: 'supersecret'
+    61def4de798453e39d5af289f742eb15827973e7
+
 
 Installation
 ------------
 
+From pip:
+
+    $ pip install pwm
+
+From source:
+
     $ python setup.py install
+
+
+Development
+-----------
+
+Set up a new virtualenv:
+
+    $ virtualenv venv
+    $ . venv/bin/activate
+    $ pip install -e .[test]
+
+Do your stuff, test your code by running nose:
+
+    $ nosetests
