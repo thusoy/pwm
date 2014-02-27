@@ -1,4 +1,4 @@
-pwm
+pwm [![Build Status](https://travis-ci.org/thusoy/pwm.png?branch=master)](https://travis-ci.org/thusoy/pwm)
 ===
 
 A minimal, secure password manager that can't tell on you.
