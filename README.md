@@ -44,3 +44,5 @@ Set up a new virtualenv:
 Do your stuff, test your code by running nosy, which automatically reruns tests on changes:
 
     $ nosy
+
+Keep [test coverage](http://thusoy.github.io/pwm/) up.
