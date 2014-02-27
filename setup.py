@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 """
     pwm
     ~~~~~~~~~~~~~~
@@ -8,7 +9,7 @@
 """
 
 import sys
-from setuptools import setup, find_packages
+from setuptools import setup
 
 install_requires = [
     'sqlalchemy',
@@ -25,7 +26,7 @@ setup(
     author_email='tarjei@roms.no',
     url='https://github.com/thusoy/pwm',
     description="A superlight password manager",
-    packages=find_packages(),
+    py_modules=['pwm'],
     install_requires=install_requires,
     extras_require={
         'test': ['mock', 'nose', 'coverage'],
