@@ -1,10 +1,10 @@
 import argparse
 import getpass
 import hashlib
-import httplib
 import logging.config
 import os
 import requests
+import sys
 import textwrap
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
@@ -12,10 +12,12 @@ from sqlalchemy.orm import sessionmaker
 from logging import getLogger
 
 try:
-    import configparser
+    from configparser import RawConfigParser
+    from http.client import HTTPConnection
 except:
     # python 2
-    import ConfigParser as configparser
+    from ConfigParser import RawConfigParser
+    from httplib import HTTPConnection
     input = raw_input
 
 
@@ -32,7 +34,8 @@ class DomainPassword(Base):
 
     def __init__(self, **kwargs):
         super(DomainPassword, self).__init__(**kwargs)
-        self.new_salt()
+        if not 'salt' in kwargs:
+            self.new_salt()
 
 
     def new_salt(self):
@@ -40,20 +43,21 @@ class DomainPassword(Base):
 
 
     def derive_domain_key(self, master_password):
-        key_bytes = hashlib.sha1('%s:%s' % (master_password, self.domain)).digest()
-        return key_bytes.encode('hex')
+        bytes = ('%s:%s' % (master_password, self.domain)).encode('utf8')
+        key = hashlib.sha1(bytes).hexdigest()
+        return key
 
 
     def __repr__(self):
         return 'DomainPassword(domain=%s, salt=%s)' % (self.domain, self.salt)
 
 
-
 def main():
     args = get_args()
-    domain_password = get_domain_password(args)
+    pwm = PWM(config_file=args.config_file)
+    domain_password = pwm.get_domain_salt(args.domain)
     master_password = getpass.getpass('Enter your master password: ')
-    print domain_password.derive_domain_key(master_password)
+    print(domain_password.derive_domain_key(master_password))
 
 
 def get_args():
@@ -64,87 +68,128 @@ def get_args():
     argparser.add_argument('-v', '--verbose', action='store_true',
         help='Increase verbosity',
     )
-    rc_dir = os.path.join(os.path.expanduser('~'), '.pwm')
+    default_config_file = os.path.join(os.path.expanduser('~'), '.pwm', 'config')
+    argparser.add_argument('-c', '--config-file', metavar='<config-file>',
+        help='Path to config file to use. Default: %(default)s',
+        default=default_config_file,
+    )
     args = argparser.parse_args()
     _init_logging(verbose=args.verbose)
-    if not os.path.exists(rc_dir):
-        os.makedirs(rc_dir)
-        run_setup()
-    config = read_config()
-    args.database = config.get('pwm', 'database')
-    client_certificate = os.path.join(rc_dir, config.get('pwm', 'certificate'))
-    client_key = os.path.join(rc_dir, config.get('pwm', 'key'))
-    args.auth = (client_certificate, client_key)
     return args
 
 
-def run_setup():
-    print textwrap.dedent("""\
-        Hi, it looks like it's the first time you're using pwm on this machine. Let's take a little
-        moment to set things up before we begin.""")
-    db_uri = input('Which database do you want to use? Default: local') or 'local'
-    rc_dir = os.path.join(os.path.expanduser('~'), '.pwm')
+class PWM(object):
 
-    if db_uri == 'local':
-
-        # normalize windows-style paths for sqlalchemy:
-        rc_dir = rc_dir.replace('\\', '/')
-
-        # Create the local database
-        db_uri = 'sqlite:///%s/db.sqlite' % rc_dir
-        db = sa.create_engine(db_uri)
-        Base.metadata.create_all(db)
-
-    config = configparser.RawConfigParser()
-    config.add_section('pwm')
-    config.set('pwm', 'database', db_uri)
-
-    with open(os.path.join(rc_dir, 'config'), 'w') as configfile:
-        config.write(configfile)
+    def __init__(self, config_file=None):
+        if not os.path.exists(config_file):
+            os.makedirs(os.path.dirname(config_file))
+            self.run_setup()
+        self.read_config(config_file)
 
 
-def read_config():
-    config_file = os.path.join(os.path.expanduser('~'), '.pwm', 'config')
-    config = configparser.RawConfigParser()
-    config.read(config_file)
-    return config
+    def read_config(self, config_file):
+        defaults = {
+            'server-certificate': None,
+            'client-certificate': None,
+            'client-key': None,
+        }
+        config_parser = RawConfigParser(defaults=defaults)
+        config = {}
+        config_parser.read(config_file)
+        config['database'] = config_parser.get('pwm', 'database')
+
+        client_certificate = config_parser.get('pwm', 'client-certificate')
+        client_key = config_parser.get('pwm', 'client-key')
+        if client_certificate and client_key:
+            client_certificate_path = os.path.join(os.path.dirname(config_file), client_certificate)
+            client_key_path = os.path.join(os.path.dirname(config_file), client_key)
+            config['auth'] = (client_certificate_path, client_key_path)
+
+        if config_parser.get('pwm', 'server-certificate'):
+            config['server_certificate'] = os.path.join(os.path.dirname(config_file), config_parser.get('pwm', 'server-certificate'))
+        self.config = config
 
 
-def get_domain_password(args):
-    protocol = args.database.split(':', 1)[0]
-    if protocol in ('https', 'http'):
-        return get_salt_from_rest_api(args.database, args.domain, auth=args.auth)
-    else:
-        return get_salt_from_db(args.database, args.domain)
+    def run_setup(self):
+        print(textwrap.dedent("""\
+            Hi, it looks like it's the first time you're using pwm on this machine. Let's take a little
+            moment to set things up before we begin."""))
+        db_uri = input('Which database do you want to use? Default: local') or 'local'
+        rc_dir = os.path.join(os.path.expanduser('~'), '.pwm')
+
+        if db_uri == 'local':
+
+            # normalize windows-style paths for sqlalchemy:
+            rc_dir = rc_dir.replace('\\', '/')
+
+            # Create the local database
+            db_uri = 'sqlite:///%s/db.sqlite' % rc_dir
+            db = sa.create_engine(db_uri)
+            Base.metadata.create_all(db)
+
+        config = RawConfigParser()
+        config.add_section('pwm')
+        config.set('pwm', 'database', db_uri)
+
+        with open(os.path.join(rc_dir, 'config'), 'w') as configfile:
+            config.write(configfile)
 
 
-def get_salt_from_rest_api(api_url, domain, auth):
-    payload = {'domain': domain}
-    response = requests.get(api_url + '/get', params=payload)
-    domain_password = DomainPassword(domain=domain, salt=response.json()['salt'])
-    return domain_password
+    def get_domain_salt(self, domain):
+        protocol = self.config['database'].split(':', 1)[0]
+        if protocol in ('https', 'http'):
+            return self.get_salt_from_rest_api(domain)
+        else:
+            return self.get_salt_from_db(domain)
 
 
-def get_salt_from_db(database, domain):
-    session = get_db_session(database)
-    domain_password = get_salt(session, domain)
-    return domain_password
+    def get_salt_from_rest_api(self, domain):
+        request_args = {
+            'params': {'domain': domain}
+        }
+        verify = True
+        server_certificate = self.config.get('server_certificate')
+        if server_certificate:
+            verify = os.path.join(os.path.dirname(server_certificate), server_certificate)
+            _logger.debug('Pinning server with certificate at %s', verify)
+
+        # Test for SNI support on python 2
+        if sys.version_info < (3, 0, 0):
+            try:
+                import urllib3.contrib.pyopenssl
+                urllib3.contrib.pyopenssl.inject_into_urllib3()
+            except ImportError:
+                _logger.warning("Running on python 2 without SNI support, can't verify server certificates.")
+                verify = False
+        request_args['verify'] = verify
+
+        if self.config.get('auth'):
+            request_args['cert'] = self.config['auth']
+        response = requests.get(self.config['database'] + '/get', **request_args)
+        domain_password = DomainPassword(domain=domain, salt=response.json()['salt'])
+        return domain_password
 
 
-def get_salt(session, domain):
-    domain_password = session.query(DomainPassword).filter(DomainPassword.domain == domain).first()
-    if domain_password is None:
-        domain_password = DomainPassword(domain=domain)
-        session.add(domain_password)
-        session.commit()
-    return domain_password
+    def get_salt_from_db(self, domain):
+        session = self.get_db_session()
+        domain_password = self.get_salt(session, domain)
+        return domain_password
 
 
-def get_db_session(database):
-    db = sa.create_engine(database)
-    DBSession = sessionmaker(bind=db)
-    session = DBSession()
-    return session
+    def get_salt(session, domain):
+        domain_password = session.query(DomainPassword).filter(DomainPassword.domain == domain).first()
+        if domain_password is None:
+            domain_password = DomainPassword(domain=domain)
+            session.add(domain_password)
+            session.commit()
+        return domain_password
+
+
+    def get_db_session(self):
+        db = sa.create_engine(self.config['database'])
+        DBSession = sessionmaker(bind=db)
+        session = DBSession()
+        return session
 
 
 def _init_logging(verbose=False):
@@ -152,15 +197,15 @@ def _init_logging(verbose=False):
     config = {
         'version': 1,
         'formatters': {
-            'normal': {
-                'format': '%(asctime)s %(levelname)-10s %(name)s %(message)s',
+            'console': {
+                'format': '* %(message)s',
             }
         },
         'handlers': {
             'console': {
                 'class': 'logging.StreamHandler',
                 'level': 'DEBUG',
-                'formatter': 'normal',
+                'formatter': 'console',
                 'stream': 'ext://sys.stdout',
             }
         },
@@ -178,4 +223,4 @@ def _init_logging(verbose=False):
         }
     }
     logging.config.dictConfig(config)
-    httplib.HTTPConnection.debuglevel = 1 if verbose else 0
+    HTTPConnection.debuglevel = 1 if verbose else 0
