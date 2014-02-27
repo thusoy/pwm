@@ -25,15 +25,15 @@ Base = declarative_base()
 _logger = getLogger('pwm')
 
 
-class DomainPassword(Base):
-    __tablename__ = 'domainpassword'
+class Domain(Base):
+    __tablename__ = 'domain'
     id = sa.Column(sa.Integer, primary_key=True)
     domain = sa.Column(sa.String(30))
     salt = sa.Column(sa.String(128))
 
 
     def __init__(self, **kwargs):
-        super(DomainPassword, self).__init__(**kwargs)
+        super(Domain, self).__init__(**kwargs)
         if not 'salt' in kwargs:
             self.new_salt()
 
@@ -42,14 +42,14 @@ class DomainPassword(Base):
         self.salt = os.urandom(128).encode('base64')
 
 
-    def derive_domain_key(self, master_password):
+    def derive_key(self, master_password):
         bytes = ('%s:%s:%s' % (master_password, self.domain, self.salt)).encode('utf8')
         key = hashlib.sha1(bytes).hexdigest()
         return key
 
 
     def __repr__(self):
-        return 'DomainPassword(domain=%s, salt=%s)' % (self.domain, self.salt)
+        return 'Domain(domain=%s, salt=%s)' % (self.domain, self.salt)
 
 
 def main():
@@ -57,7 +57,7 @@ def main():
     pwm = PWM(config_file=args.config_file)
     domain_password = pwm.get_domain_salt(args.domain)
     master_password = getpass.getpass('Enter your master password: ')
-    print(domain_password.derive_domain_key(master_password))
+    print(domain_password.derive_key(master_password))
 
 
 def get_args():
@@ -73,6 +73,9 @@ def get_args():
         help='Path to config file to use. Default: %(default)s',
         default=default_config_file,
     )
+    argparser.add_argument('-s', '--search', metavar='<search>',
+        help='Search among existing domains',
+    )
     args = argparser.parse_args()
     _init_logging(verbose=args.verbose)
     return args
@@ -80,12 +83,13 @@ def get_args():
 
 class PWM(object):
 
-    def __init__(self, config_file=None):
+    def __init__(self, config_file=None, session=None):
         if not os.path.exists(config_file):
             if not os.path.exists(os.path.dirname(config_file)):
                 os.makedirs(os.path.dirname(config_file))
             self.run_setup(config_file)
         self.read_config(config_file)
+        self.session = session
 
 
     def read_config(self, config_file):
@@ -173,30 +177,30 @@ class PWM(object):
         if self.config.get('auth'):
             request_args['cert'] = self.config['auth']
         response = requests.get(self.config['database'] + '/get', **request_args)
-        domain_password = DomainPassword(domain=domain, salt=response.json()['salt'])
+        domain_password = Domain(domain=domain, salt=response.json()['salt'])
         return domain_password
 
 
     def get_salt_from_db(self, domain):
-        session = self.get_db_session()
-        domain_password = self.get_salt(session, domain)
+        if not self.session:
+            self.init_db_session()
+        domain_password = self.get_salt(self.session, domain)
         return domain_password
 
 
     def get_salt(self, session, domain):
-        domain_password = session.query(DomainPassword).filter(DomainPassword.domain == domain).first()
+        domain_password = session.query(Domain).filter(Domain.domain == domain).first()
         if domain_password is None:
-            domain_password = DomainPassword(domain=domain)
+            domain_password = Domain(domain=domain)
             session.add(domain_password)
             session.commit()
         return domain_password
 
 
-    def get_db_session(self):
+    def init_db_session(self):
         db = sa.create_engine(self.config['database'])
         DBSession = sessionmaker(bind=db)
-        session = DBSession()
-        return session
+        self.session = DBSession()
 
 
 def _init_logging(verbose=False):
