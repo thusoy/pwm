@@ -14,5 +14,11 @@ after_success:
   # Only deploy once
   - if [[ $TRAVIS_PYTHON_VERSION == "2.7" ]]; then ./travis/deploy_coverage.sh --verbose; fi
 
+env:
+  global:
+
+    # GitHub access token that grants access to thusoys GitHub account
+    - secure: "p47fT4Bf2nyiCmy9I96k5s4toYutnXmyM9qcN1G4AeccmcAu5obAtUJ+l6fM/OKFPL/AyxjS87rL3vu289vNkEaN9YRxJge7odgFf+0PR6a9s2PUISQnaeNWtnspBxEnVw6xrSfRNJcpWqsXImBfXGNR26hjAOMHS+hnT+kVGbs="
+
 notifications:
   email: false
