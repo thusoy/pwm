@@ -29,7 +29,7 @@ _logger = getLogger('pwm')
 class Domain(Base):
     __tablename__ = 'domain'
     id = sa.Column(sa.Integer, primary_key=True)
-    domain = sa.Column(sa.String(30))
+    name = sa.Column(sa.String(30))
     salt = sa.Column(sa.String(128))
 
 
@@ -40,25 +40,25 @@ class Domain(Base):
 
 
     def new_salt(self):
-        self.salt = base64.b64encode(os.urandom(128))
+        self.salt = base64.b64encode(os.urandom(32))
 
 
     def derive_key(self, master_password):
-        bytes = ('%s:%s:%s' % (master_password, self.domain, self.salt)).encode('utf8')
+        bytes = ('%s:%s:%s' % (master_password, self.name, self.salt)).encode('utf8')
         key = hashlib.sha1(bytes).hexdigest()
         return key
 
 
     def __repr__(self):
-        return 'Domain(domain=%s, salt=%s)' % (self.domain, self.salt)
+        return 'Domain(name=%s, salt=%s)' % (self.name, self.salt)
 
 
 def main():
     args = get_args()
     pwm = PWM(config_file=args.config_file)
-    domain_password = pwm.get_domain_salt(args.domain)
+    domain = pwm.get_domain(args.domain)
     master_password = getpass.getpass('Enter your master password: ')
-    print(domain_password.derive_key(master_password))
+    print(domain.derive_key(master_password))
 
 
 def get_args():
@@ -147,15 +147,15 @@ class PWM(object):
             config_parser.write(config_file_fh)
 
 
-    def get_domain_salt(self, domain):
+    def get_domain(self, domain):
         protocol = self.config['database'].split(':', 1)[0]
         if protocol in ('https', 'http'):
-            return self.get_salt_from_rest_api(domain)
+            return self.get_domain_from_rest_api(domain)
         else:
-            return self.get_salt_from_db(domain)
+            return self.get_domain_from_db(domain)
 
 
-    def get_salt_from_rest_api(self, domain):
+    def get_domain_from_rest_api(self, domain):
         request_args = {
             'params': {'domain': domain}
         }
@@ -178,24 +178,24 @@ class PWM(object):
         if self.config.get('auth'):
             request_args['cert'] = self.config['auth']
         response = requests.get(self.config['database'] + '/get', **request_args)
-        domain_password = Domain(domain=domain, salt=response.json()['salt'])
-        return domain_password
+        domain = Domain(name=domain, salt=response.json()['salt'])
+        return domain
 
 
-    def get_salt_from_db(self, domain):
+    def get_domain_from_db(self, domain):
         if not self.session:
             self.init_db_session()
-        domain_password = self.get_salt(self.session, domain)
-        return domain_password
+        domain = self.get_or_insert_domain(self.session, domain)
+        return domain
 
 
-    def get_salt(self, session, domain):
-        domain_password = session.query(Domain).filter(Domain.domain == domain).first()
-        if domain_password is None:
-            domain_password = Domain(domain=domain)
-            session.add(domain_password)
+    def get_or_insert_domain(self, session, domain_name):
+        domain = session.query(Domain).filter(Domain.name == domain_name).first()
+        if domain is None:
+            domain = Domain(name=domain_name)
+            session.add(domain)
             session.commit()
-        return domain_password
+        return domain
 
 
     def init_db_session(self):
