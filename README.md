@@ -10,7 +10,12 @@ So what does pwm do differently? Instead of storing your passwords, it stores so
 Usage
 -----
 
-    $ pwm mybank.com
+    $ pwm search .com
+    mybank.com
+    ebay.com
+    facebook.com
+
+    $ pwm get mybank.com
     Enter your master password: 'supersecret'
     61def4de798453e39d5af289f742eb15827973e7
 

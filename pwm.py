@@ -55,31 +55,67 @@ class Domain(Base):
 
 def main():
     args = get_args()
-    pwm = PWM(config_file=args.config_file)
-    domain = pwm.get_domain(args.domain)
-    master_password = getpass.getpass('Enter your master password: ')
-    print(domain.derive_key(master_password))
+    args.target(args)
 
 
 def get_args():
     argparser = argparse.ArgumentParser(prog='pwm')
-    argparser.add_argument('domain',
-        help='The domain to retrieve the password for',
-    )
-    argparser.add_argument('-v', '--verbose', action='store_true',
+    argparser.add_argument('-v', '--verbose',
+        action='store_true',
         help='Increase verbosity',
     )
     default_config_file = os.path.join(os.path.expanduser('~'), '.pwm', 'config')
-    argparser.add_argument('-c', '--config-file', metavar='<config-file>',
+    argparser.add_argument('-c', '--config-file',
+        metavar='<config-file>',
         help='Path to config file to use. Default: %(default)s',
         default=default_config_file,
     )
-    argparser.add_argument('-s', '--search', metavar='<search>',
-        help='Search among existing domains',
+
+    # Add subparserss
+    subparsers = argparser.add_subparsers(dest='action',
+        title='Action',
+        help='What do you want to do?',
     )
+    add_get_parser(subparsers)
+    add_search_parser(subparsers)
+
     args = argparser.parse_args()
     _init_logging(verbose=args.verbose)
     return args
+
+
+def add_get_parser(subparsers):
+    parser = subparsers.add_parser('get',
+        help='Get the key for a domain',
+    )
+    parser.add_argument('domain',
+        help='The domain to retrieve the password for',
+    )
+    parser.set_defaults(target=get)
+
+
+def add_search_parser(subparsers):
+    parser = subparsers.add_parser('search',
+        help='Search for existing domains',
+    )
+    parser.add_argument('query',
+        help='The query string to search for',
+    )
+    parser.set_defaults(target=search)
+
+
+def search(args):
+    pwm = PWM(config_file=args.config_file)
+    results = pwm.search(args.query)
+    for result in results:
+        print(result.name)
+
+
+def get(args):
+    pwm = PWM(config_file=args.config_file)
+    domain = pwm.get_domain(args.domain)
+    master_password = getpass.getpass('Enter your master password: ')
+    print(domain.derive_key(master_password))
 
 
 class PWM(object):
@@ -114,6 +150,13 @@ class PWM(object):
         if config_parser.get('pwm', 'server-certificate'):
             config['server_certificate'] = os.path.join(os.path.dirname(config_file), config_parser.get('pwm', 'server-certificate'))
         self.config = config
+
+
+    def search(self, query):
+        if not self.session:
+            self.init_db_session()
+        results = self.session.query(Domain).filter(Domain.name.ilike('%%%s%%' % query)).all()
+        return results
 
 
     def run_setup(self, config_file):

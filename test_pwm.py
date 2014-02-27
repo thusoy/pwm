@@ -22,6 +22,8 @@ class PWMTest(unittest.TestCase):
         DBSession = sessionmaker(bind=db)
         self.session = DBSession()
         self.session.add(pwm.Domain(name='example.com', salt='NaCl'))
+        self.session.add(pwm.Domain(name='otherexample.com', salt='supersalty'))
+        self.session.add(pwm.Domain(name='facebook.com', salt='notsomuch'))
         self.session.commit()
         self.pwm = pwm.PWM(config_file=self.tmp_config.name, session=self.session)
 
@@ -36,6 +38,7 @@ class PWMTest(unittest.TestCase):
         salt = self.pwm.get_domain('example.com').salt
         self.assertEqual(salt, 'NaCl')
 
+
     def test_add_domain(self):
         new_domain = self.pwm.get_domain('othersite.com')
         key = new_domain.derive_key('secret')
@@ -43,3 +46,8 @@ class PWMTest(unittest.TestCase):
         # should now get the same key on second attempt
         db_domain = pwm.Domain(name='othersite.com', salt=new_domain.salt)
         self.assertEqual(db_domain.derive_key('secret'), key)
+
+
+    def test_domain_search(self):
+        results = self.pwm.search('example')
+        self.assertEqual(len(results), 2)
