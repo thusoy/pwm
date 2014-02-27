@@ -29,7 +29,7 @@ setup(
     py_modules=['pwm'],
     install_requires=install_requires,
     extras_require={
-        'test': ['mock', 'nose', 'coverage'],
+        'test': ['nose', 'nosy', 'coverage'],
     },
     entry_points={
         'console_scripts': [

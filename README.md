@@ -36,6 +36,6 @@ Set up a new virtualenv:
     $ . venv/bin/activate
     $ pip install -e .[test]
 
-Do your stuff, test your code by running nose:
+Do your stuff, test your code by running nosy, which automatically reruns tests on changes:
 
-    $ nosetests
+    $ nosy

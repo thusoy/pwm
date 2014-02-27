@@ -37,3 +37,6 @@ nosetests.xml
 
 # packages
 venv
+
+# stuff
+cover
