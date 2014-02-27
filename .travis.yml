@@ -8,7 +8,11 @@ python:
 install:
   - pip install -e .[test]
 
-script: nosetests
+script: nosetests --with-coverage --cover-html --cover-package=pwm
+
+after_success:
+  # Only deploy once
+  - if [[ $TRAVIS_PYTHON_VERSION == "2.7" ]]; then ./travis/deploy_coverage.sh --verbose; fi
 
 notifications:
   email: false
