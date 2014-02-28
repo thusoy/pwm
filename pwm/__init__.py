@@ -12,6 +12,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from logging import getLogger
 
+from . import encoding
+
 try:
     from configparser import RawConfigParser
     from http.client import HTTPConnection
@@ -31,10 +33,16 @@ class Domain(Base):
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(30))
     salt = sa.Column(sa.String(128))
+    charset = sa.Column(sa.String(128))
+    encoding_length = sa.Column(sa.Integer())
 
 
     def __init__(self, **kwargs):
         super(Domain, self).__init__(**kwargs)
+        if not 'encoding_length' in kwargs:
+            self.encoding_length = encoding.DEFAULT_LENGTH
+        if not 'charset' in kwargs:
+            self.charset = encoding.DEFAULT_ALPHABET
         if not 'salt' in kwargs:
             self.new_salt()
 
@@ -44,13 +52,14 @@ class Domain(Base):
 
 
     def derive_key(self, master_password):
+        encoder = encoding.Encoder(self.charset)
         bytes = ('%s:%s:%s' % (master_password, self.name, self.salt)).encode('utf8')
-        key = hashlib.sha1(bytes).hexdigest()
-        return key
+        return encoder.encode(hashlib.sha1(bytes), self.encoding_length)
 
 
     def __repr__(self):
-        return 'Domain(name=%s, salt=%s)' % (self.name, self.salt)
+        return 'Domain(name=%s, salt=%s, charset=%s, length=%s)' \
+                % (self.name, self.salt, self.charset, self.encoding_length)
 
 
 def main():
@@ -88,6 +97,15 @@ def add_get_parser(subparsers):
     parser = subparsers.add_parser('get',
         help='Get the key for a domain',
     )
+    parser.add_argument('-l', '--length',
+        help='Override output length',
+        type=int,
+        default=encoding.DEFAULT_LENGTH,
+    )
+    parser.add_argument('-c', '--charset',
+        help='Use this (named or custom) charset',
+        default=encoding.DEFAULT_CHARSET,
+    )
     parser.add_argument('domain',
         help='The domain to retrieve the password for',
     )
@@ -113,7 +131,8 @@ def search(args):
 
 def get(args):
     pwm = PWM(config_file=args.config_file)
-    domain = pwm.get_domain(args.domain)
+    charset = encoding.lookup_alphabet(args.charset)
+    domain = pwm.get_domain(args.domain, args.length, charset)
     master_password = getpass.getpass('Enter your master password: ')
     print(domain.derive_key(master_password))
 
@@ -190,15 +209,16 @@ class PWM(object):
             config_parser.write(config_file_fh)
 
 
-    def get_domain(self, domain):
+    def get_domain(self, domain, length=encoding.DEFAULT_LENGTH,
+    charset=encoding.DEFAULT_ALPHABET):
         protocol = self.config['database'].split(':', 1)[0]
         if protocol in ('https', 'http'):
-            return self.get_domain_from_rest_api(domain)
+            return self.get_domain_from_rest_api(domain, length, charset)
         else:
-            return self.get_domain_from_db(domain)
+            return self.get_domain_from_db(domain, length, charset)
 
 
-    def get_domain_from_rest_api(self, domain):
+    def get_domain_from_rest_api(self, domain, length, charset):
         request_args = {
             'params': {'domain': domain}
         }
@@ -225,17 +245,19 @@ class PWM(object):
         return domain
 
 
-    def get_domain_from_db(self, domain):
+    def get_domain_from_db(self, domain, length, charset):
         if not self.session:
             self.init_db_session()
-        domain = self.get_or_insert_domain(self.session, domain)
+        domain = self.get_or_insert_domain(self.session, domain, length,
+                                         charset)
         return domain
 
 
-    def get_or_insert_domain(self, session, domain_name):
+    def get_or_insert_domain(self, session, domain_name, length, charset):
         domain = session.query(Domain).filter(Domain.name == domain_name).first()
         if domain is None:
-            domain = Domain(name=domain_name)
+            domain = Domain(name=domain_name, encoding_length=length,
+                            charset=charset)
             session.add(domain)
             session.commit()
         return domain
