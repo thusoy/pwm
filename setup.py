@@ -26,7 +26,7 @@ setup(
     author_email='tarjei@roms.no',
     url='https://github.com/thusoy/pwm',
     description="A superlight password manager",
-    py_modules=['pwm'],
+    packages=['pwm'],
     install_requires=install_requires,
     extras_require={
         'test': ['nose', 'nosy', 'coverage'],
