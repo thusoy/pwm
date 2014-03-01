@@ -20,8 +20,10 @@ except TypeError:
 
 DEFAULT_CHARSET = 'full'
 DEFAULT_LENGTH = 16
+# 'full' repeats digits twice, to increase the probablity of a digit appearing in a default 16
+# character password, for sites that suck at estimating entropy and requires digits to be present
 PRESETS = {
-    'full': string.ascii_letters + string.digits + '!#$%&()*+,-./:;=?@[]^_|~',
+    'full': string.ascii_letters + 2 * string.digits + '!#$%&()*+,-./:;=?@[]^_|~',
     'alpha': string.ascii_letters,
     'numeric': string.digits,
     'alphanumeric': string.ascii_letters + string.digits,
