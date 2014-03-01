@@ -63,7 +63,7 @@ class Domain(Base):
     def get_key(self):
         """ Fetches the key for the domain. Prompts the user for password.
 
-        Thin wrapper around `Domain.derive_key`.
+        Thin wrapper around :func:`Domain.derive_key <pwm.core.Domain.derive_key>`.
         """
         master_password = getpass.getpass('Enter your master password: ')
         return self.derive_key(master_password)
@@ -164,6 +164,12 @@ class PWM(object):
 
 
     def create_domain(self, domain_name, charset=encoding.DEFAULT_CHARSET, length=encoding.DEFAULT_LENGTH):
+        """ Create a new domain entry in the database.
+
+        :param username: The username to associate with this domain.
+        :param charset: A character set restriction to impose on keys generated for this domain.
+        :param length: The length of the generated key, in case of restrictions on the site.
+        """
         full_charset = encoding.lookup_alphabet(charset)
         domain = Domain(name=domain_name, encoding_length=length, charset=full_charset)
         if not self.session:
