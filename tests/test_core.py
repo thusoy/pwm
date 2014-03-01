@@ -57,5 +57,6 @@ class PWMCoreTest(unittest.TestCase):
 
 
     def test_no_duplicates(self):
-        with self.assertRaises(DuplicateDomainException):
-            self.pwm.create_domain('example.com')
+        # PY26: If we drop support for python 2.6, this can be rewritten to use assertRaises as a
+        # context manager, which is better for readability
+        self.assertRaises(DuplicateDomainException, self.pwm.create_domain, 'example.com')
