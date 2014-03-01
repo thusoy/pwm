@@ -52,7 +52,7 @@ Set up a new virtualenv:
 
     $ virtualenv venv
     $ . venv/bin/activate
-    $ pip install -e .[test]
+    $ pip install -e .[dev]
 
 Do your stuff, test your code by running nosy, which automatically reruns tests on changes:
 

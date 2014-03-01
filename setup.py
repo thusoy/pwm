@@ -19,6 +19,10 @@ install_requires = [
 if sys.version_info < (2, 7, 0):
     install_requires.append('argparse')
 
+extras = {}
+extras['test'] = ['nose', 'coverage']
+extras['dev'] = extras['test'] + ['tox', 'nosy', 'sphinx']
+
 setup(
     name='pwm',
     version='0.1.3',
@@ -28,9 +32,7 @@ setup(
     description="A superlight password manager",
     packages=['pwm'],
     install_requires=install_requires,
-    extras_require={
-        'test': ['tox', 'nose', 'nosy', 'coverage'],
-    },
+    extras_require=extras,
     entry_points={
         'console_scripts': [
             'pwm = pwm.cli:main',
