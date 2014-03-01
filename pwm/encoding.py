@@ -17,9 +17,15 @@ except TypeError:
         ''' convert a single byte into integer representation '''
         return byte
 
+
 DEFAULT_CHARSET = 'full'
 DEFAULT_LENGTH = 16
-PRESETS = {}
+PRESETS = {
+    'full': string.ascii_letters + string.digits + '!#$%&()*+,-./:;=?@[]^_|~',
+    'alpha': string.ascii_letters,
+    'numeric': string.digits,
+    'alphanumeric': string.ascii_letters + string.digits,
+}
 
 def ceildiv(dividend, divisor):
     ''' integer ceiling division '''
@@ -93,9 +99,6 @@ class Encoder(object):
         '''
         return data[index*self.chunklen[0]:(index+1)*self.chunklen[0]]
 
-PRESETS['full'] = string.ascii_lowercase + string.ascii_uppercase \
-                  + 2 * string.digits + '!#$%&()*+,-./:;=?@[]^_|~'
-DEFAULT_ALPHABET = PRESETS[DEFAULT_CHARSET]
 
 def lookup_alphabet(charset):
     '''
