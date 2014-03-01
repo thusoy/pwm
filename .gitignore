@@ -40,3 +40,6 @@ venv
 
 # stuff
 cover
+
+# built documentation
+docs/_build
