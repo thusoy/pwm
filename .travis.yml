@@ -8,7 +8,7 @@ python:
 install:
   - pip install -e .[test]
 
-script: nosetests --with-coverage --cover-html --cover-package=pwm
+script: nosetests --with-coverage --cover-html --cover-package=pwm --cover-branches
 
 after_success:
   # Only deploy once
