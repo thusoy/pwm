@@ -1,10 +1,8 @@
-import argparse
 import base64
 import getpass
 import hashlib
-import logging.config
-import os
 import requests
+import os
 import sys
 import textwrap
 import sqlalchemy as sa
@@ -16,11 +14,9 @@ from . import encoding
 
 try:
     from configparser import RawConfigParser
-    from http.client import HTTPConnection
 except:
     # python 2
     from ConfigParser import RawConfigParser
-    from httplib import HTTPConnection
     input = raw_input
 
 
@@ -62,66 +58,6 @@ class Domain(Base):
                 % (self.name, self.salt, self.charset, self.encoding_length)
 
 
-def main():
-    args = get_args()
-    args.target(args)
-
-
-def get_args():
-    argparser = argparse.ArgumentParser(prog='pwm')
-    argparser.add_argument('-v', '--verbose',
-        action='store_true',
-        help='Increase verbosity',
-    )
-    default_config_file = os.path.join(os.path.expanduser('~'), '.pwm', 'config')
-    argparser.add_argument('-c', '--config-file',
-        metavar='<config-file>',
-        help='Path to config file to use. Default: %(default)s',
-        default=default_config_file,
-    )
-
-    # Add subparserss
-    subparsers = argparser.add_subparsers(dest='action',
-        title='Action',
-        help='What do you want to do?',
-    )
-    add_get_parser(subparsers)
-    add_search_parser(subparsers)
-
-    args = argparser.parse_args()
-    _init_logging(verbose=args.verbose)
-    return args
-
-
-def add_get_parser(subparsers):
-    parser = subparsers.add_parser('get',
-        help='Get the key for a domain',
-    )
-    parser.add_argument('-l', '--length',
-        help='Override output length',
-        type=int,
-        default=encoding.DEFAULT_LENGTH,
-    )
-    parser.add_argument('-c', '--charset',
-        help='Use this (named or custom) charset',
-        default=encoding.DEFAULT_CHARSET,
-    )
-    parser.add_argument('domain',
-        help='The domain to retrieve the password for',
-    )
-    parser.set_defaults(target=get)
-
-
-def add_search_parser(subparsers):
-    parser = subparsers.add_parser('search',
-        help='Search for existing domains',
-    )
-    parser.add_argument('query',
-        help='The query string to search for',
-    )
-    parser.set_defaults(target=search)
-
-
 def search(args):
     pwm = PWM(config_file=args.config_file)
     results = pwm.search(args.query)
@@ -135,6 +71,11 @@ def get(args):
     domain = pwm.get_domain(args.domain, args.length, charset)
     master_password = getpass.getpass('Enter your master password: ')
     print(domain.derive_key(master_password))
+
+
+def set(args):
+    pwm = PWM(config_file=args.config_file)
+
 
 
 class PWM(object):
@@ -267,37 +208,3 @@ class PWM(object):
         db = sa.create_engine(self.config['database'])
         DBSession = sessionmaker(bind=db)
         self.session = DBSession()
-
-
-def _init_logging(verbose=False):
-    """ Initialize loggers. """
-    config = {
-        'version': 1,
-        'formatters': {
-            'console': {
-                'format': '* %(message)s',
-            }
-        },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'level': 'DEBUG',
-                'formatter': 'console',
-                'stream': 'ext://sys.stdout',
-            }
-        },
-        'loggers': {
-            'pwm': {
-                'level': 'DEBUG' if verbose else 'INFO',
-                'handlers': ['console'],
-                'propagate': True,
-            },
-            'requests.packages.urllib3': {
-                'level': 'INFO' if verbose else 'WARNING',
-                'handlers': ['console'],
-                'propagate': True,
-            }
-        }
-    }
-    logging.config.dictConfig(config)
-    HTTPConnection.debuglevel = 1 if verbose else 0
