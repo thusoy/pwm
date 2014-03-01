@@ -36,10 +36,34 @@ def get_args():
     )
     add_get_parser(subparsers)
     add_search_parser(subparsers)
+    add_create_parser(subparsers)
 
     args = argparser.parse_args()
     _init_logging(verbose=args.verbose)
     return args
+
+
+def add_create_parser(subparsers):
+    parser = subparsers.add_parser('create',
+        help='Create keys for a new domain',
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument('domain',
+        help='The domain to create a key for',
+    )
+    parser.add_argument('-l', '--length',
+        metavar='<length>',
+        help='Set length of generated key. Default: %(default)d',
+        type=int,
+        default=encoding.DEFAULT_LENGTH,
+    )
+    parser.add_argument('-c', '--charset',
+        metavar='<charset>',
+        help='Use this (named or custom) charset. Named presets include:\n\n%s' %
+            '\n'.join("'%s': '%s'" % (name, alphabet.replace('%', '%%')) for name, alphabet in encoding.PRESETS.items()),
+        default='full',
+    )
+    parser.set_defaults(target=create)
 
 
 def add_get_parser(subparsers):
@@ -78,6 +102,18 @@ def get(args):
         return 0
     else:
         print("Couldn't find any entries for '%s', are you sure you have created any?" % args.domain)
+        return 1
+
+
+def create(args):
+    pwm = PWM(config_file=args.config_file)
+    length = args.length
+    domain = pwm.create_domain(args.domain, args.charset, length)
+    if domain:
+        print('New domain successfully created.')
+        print(domain.get_key())
+        return 0
+    else:
         return 1
 
 

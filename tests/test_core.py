@@ -41,7 +41,7 @@ class PWMCoreTest(unittest.TestCase):
 
 
     def test_add_domain(self):
-        new_domain = self.pwm.get_domain('othersite.com')
+        new_domain = self.pwm.create_domain('othersite.com')
         key = new_domain.derive_key('secret')
 
         # should now get the same key on second attempt
@@ -54,3 +54,8 @@ class PWMCoreTest(unittest.TestCase):
         self.assertEqual(len(results), 2)
         results = self.pwm.search('bank')
         self.assertEqual(len(results), 0)
+
+
+    def test_no_duplicates(self):
+        with self.assertRaises(DuplicateDomainException):
+            self.pwm.create_domain('example.com')

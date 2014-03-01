@@ -1,5 +1,6 @@
 from . import encoding
 from ._compat import RawConfigParser
+from .exceptions import DuplicateDomainException
 
 import base64
 import getpass
@@ -159,6 +160,20 @@ class PWM(object):
         if not self.session:
             self._init_db_session()
         domain = self.session.query(Domain).filter(Domain.name == domain_name).first()
+        return domain
+
+
+    def create_domain(self, domain_name, charset=encoding.DEFAULT_CHARSET, length=encoding.DEFAULT_LENGTH):
+        full_charset = encoding.lookup_alphabet(charset)
+        domain = Domain(name=domain_name, encoding_length=length, charset=full_charset)
+        if not self.session:
+            self._init_db_session()
+        try:
+            self.session.add(domain)
+            self.session.commit()
+        except Exception as ex:
+            _logger.warn("Inserting new domain failed: %s", ex)
+            raise DuplicateDomainException
         return domain
 
 
