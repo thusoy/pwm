@@ -1,20 +1,19 @@
-from . import get, search, encoding
+from . import PWM, encoding, Base
+from ._compat import HTTPConnection, RawConfigParser
 
 import argparse
 import os
+import sys
 import logging.config
-
-try:
-    from http.client import HTTPConnection
-except:
-    # python 2
-    from httplib import HTTPConnection
+import textwrap
+import sqlalchemy as sa
 
 
 def main():
     """ Main entry point for the CLI. """
     args = get_args()
-    args.target(args)
+    ret_code = args.target(args)
+    sys.exit(ret_code)
 
 
 def get_args():
@@ -47,10 +46,6 @@ def add_get_parser(subparsers):
     parser = subparsers.add_parser('get',
         help='Get the key for a domain',
     )
-    parser.add_argument('-c', '--charset',
-        help='Use this (named or custom) charset',
-        default=encoding.DEFAULT_CHARSET,
-    )
     parser.add_argument('domain',
         help='The domain to retrieve the password for',
     )
@@ -65,6 +60,56 @@ def add_search_parser(subparsers):
         help='The query string to search for',
     )
     parser.set_defaults(target=search)
+
+
+def search(args):
+    pwm = PWM(config_file=args.config_file)
+    results = pwm.search(args.query)
+    for result in results:
+        print(result.name)
+    return 0 if results else 1
+
+
+def get(args):
+    pwm = PWM(config_file=args.config_file)
+    domain = pwm.get_domain(args.domain)
+    if domain:
+        print(domain.get_key())
+        return 0
+    else:
+        print("Couldn't find any entries for '%s', are you sure you have created any?" % args.domain)
+        return 1
+
+
+def run_setup(self, config_file):
+    print(textwrap.dedent("""\
+        Hi, it looks like it's the first time you're using pwm on this machine. Let's take a little
+        moment to set things up before we begin."""))
+    db_uri = input('Which database do you want to use (default: local sqlite at ~/.pwm/db.sqlite) ').strip() or 'local'
+    rc_dir = os.path.dirname(config_file)
+
+    if db_uri == 'local':
+
+        # normalize windows-style paths for sqlalchemy:
+        rc_dir = rc_dir.replace('\\', '/')
+
+        # Create the local database
+        db_uri = 'sqlite:///%s/db.sqlite' % rc_dir
+    if not '://' in db_uri:
+        # Not a sqlalchemy-compatible connection string or https URI, assume it's a local path and make a sqlite
+        # uri out of it
+        db_uri = 'sqlite:///%s' % db_uri
+    if not (db_uri.startswith('https:') or db_uri.startswith('http:')):
+        # It's a local db, make sure our tables exist
+        db = sa.create_engine(db_uri)
+        Base.metadata.create_all(db)
+
+    config_parser = RawConfigParser()
+    config_parser.add_section('pwm')
+    config_parser.set('pwm', 'database', db_uri)
+
+    with open(config_file, 'w') as config_file_fh:
+        config_parser.write(config_file_fh)
 
 
 def _init_logging(verbose=False):

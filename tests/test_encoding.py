@@ -44,6 +44,7 @@ class EncodingTest(unittest.TestCase):
         self.assertEqual(enc._chunk_to_long(b'\xff\0\0\0\0'), 255 << 32)
 
     def testLookupAlphabet(self):
-        self.assertNotEqual(uut.lookup_alphabet('full'), 'full')
-        self.assertEqual(uut.lookup_alphabet(string.ascii_letters),
-                         string.ascii_letters)
+        f = uut.lookup_alphabet
+        self.assertNotEqual(f('full'), 'full')
+        self.assertEqual(f(string.ascii_letters), string.ascii_letters)
+        self.assertEqual(f('numeric'), '0123456789')

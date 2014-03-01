@@ -33,7 +33,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'pwm = pwm:main',
+            'pwm = pwm.cli:main',
         ]
     },
     classifiers=[
