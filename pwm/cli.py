@@ -1,5 +1,6 @@
-from . import PWM, encoding, Base
-from ._compat import HTTPConnection, RawConfigParser
+from . import PWM, encoding
+from .core import Base
+from ._compat import HTTPConnection, RawConfigParser, input
 
 import argparse
 import os
@@ -12,8 +13,14 @@ import sqlalchemy as sa
 def main():
     """ Main entry point for the CLI. """
     args = get_args()
+    if not _is_configured(args.config_file):
+        run_setup(args.config_file)
     ret_code = args.target(args)
     sys.exit(ret_code)
+
+
+def _is_configured(config_file):
+    return os.path.exists(config_file)
 
 
 def get_args():
@@ -51,6 +58,10 @@ def add_create_parser(subparsers):
     parser.add_argument('domain',
         help='The domain to create a key for',
     )
+    parser.add_argument('-u', '--username',
+        metavar='<username>',
+        help='The username to associate with this domain',
+    )
     parser.add_argument('-l', '--length',
         metavar='<length>',
         help='Set length of generated key. Default: %(default)d',
@@ -60,7 +71,8 @@ def add_create_parser(subparsers):
     parser.add_argument('-c', '--charset',
         metavar='<charset>',
         help='Use this (named or custom) charset. Named presets include:\n\n%s' %
-            '\n'.join("'%s': '%s'" % (name, alphabet.replace('%', '%%')) for name, alphabet in encoding.PRESETS.items()),
+            '\n'.join("'%s': '%s'" % (name, alphabet.replace('%', '%%')) for name, alphabet
+                in encoding.PRESETS.items()),
         default='full',
     )
     parser.set_defaults(target=create)
@@ -98,7 +110,10 @@ def get(args):
     pwm = PWM(config_file=args.config_file)
     domain = pwm.get_domain(args.domain)
     if domain:
-        print(domain.get_key())
+        key = domain.get_key()
+        if domain.username:
+            print('Username: %s' % domain.username)
+        print(key)
         return 0
     else:
         print("Couldn't find any entries for '%s', are you sure you have created any?" % args.domain)
@@ -108,7 +123,8 @@ def get(args):
 def create(args):
     pwm = PWM(config_file=args.config_file)
     length = args.length
-    domain = pwm.create_domain(args.domain, args.charset, length)
+    domain = pwm.create_domain(args.domain, username=args.username, charset=args.charset,
+        length=length)
     if domain:
         print('New domain successfully created.')
         print(domain.get_key())
@@ -117,7 +133,9 @@ def create(args):
         return 1
 
 
-def run_setup(self, config_file):
+def run_setup(config_file):
+    if not os.path.exists(os.path.dirname(config_file)):
+        os.makedirs(os.path.dirname(config_file))
     print(textwrap.dedent("""\
         Hi, it looks like it's the first time you're using pwm on this machine. Let's take a little
         moment to set things up before we begin."""))

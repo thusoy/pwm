@@ -37,6 +37,7 @@ class Domain(Base):
     salt = sa.Column(sa.String(128))
     charset = sa.Column(sa.String(128))
     encoding_length = sa.Column(sa.Integer())
+    username = sa.Column(sa.String(40))
 
 
     def __init__(self, **kwargs):
@@ -78,10 +79,6 @@ class PWM(object):
     """ This is the main object for interfacing with a pwm database. """
 
     def __init__(self, config_file=None, session=None):
-        if not os.path.exists(config_file):
-            if not os.path.exists(os.path.dirname(config_file)):
-                os.makedirs(os.path.dirname(config_file))
-            self.run_setup(config_file)
         self._read_config(config_file)
         self.session = session
 
@@ -163,7 +160,8 @@ class PWM(object):
         return domain
 
 
-    def create_domain(self, domain_name, charset=encoding.DEFAULT_CHARSET, length=encoding.DEFAULT_LENGTH):
+    def create_domain(self, domain_name, username=None, charset=encoding.DEFAULT_CHARSET,
+            length=encoding.DEFAULT_LENGTH):
         """ Create a new domain entry in the database.
 
         :param username: The username to associate with this domain.
@@ -171,7 +169,8 @@ class PWM(object):
         :param length: The length of the generated key, in case of restrictions on the site.
         """
         full_charset = encoding.lookup_alphabet(charset)
-        domain = Domain(name=domain_name, encoding_length=length, charset=full_charset)
+        domain = Domain(name=domain_name, username=username, encoding_length=length,
+            charset=full_charset)
         if not self.session:
             self._init_db_session()
         try:
