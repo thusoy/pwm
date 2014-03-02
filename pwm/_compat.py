@@ -21,6 +21,7 @@ if PY2: # pragma: no cover
 else: # pragma: no cover
     from configparser import RawConfigParser
     from http.client import HTTPConnection
+    input = input
     def ord_byte(byte):
         ''' convert a single byte into integer representation '''
         return byte
