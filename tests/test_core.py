@@ -1,10 +1,9 @@
-from pwm import Domain, PWM, DuplicateDomainException
+from pwm import Domain, PWM, DuplicateDomainException, NotReadyException
 from pwm.core import Base
 
 import os
 import tempfile
 import unittest
-import textwrap
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
@@ -12,13 +11,9 @@ from sqlalchemy.orm import sessionmaker
 class PWMCoreTest(unittest.TestCase):
 
     def setUp(self):
-        self.tmp_config = tempfile.NamedTemporaryFile(delete=False)
-        self.tmp_config.write(textwrap.dedent("""\
-        [pwm]
-        database = sqlite://
-        """).encode('utf-8'))
-        self.tmp_config.close()
-        db = sa.create_engine('sqlite://')
+        self.tmp_db = tempfile.NamedTemporaryFile(delete=False)
+        self.tmp_db.close()
+        db = sa.create_engine('sqlite:///%s' % self.tmp_db.name)
         Base.metadata.create_all(db)
         DBSession = sessionmaker(bind=db)
         self.session = DBSession()
@@ -26,11 +21,12 @@ class PWMCoreTest(unittest.TestCase):
         self.session.add(Domain(name='otherexample.com', salt='supersalty'))
         self.session.add(Domain(name='facebook.com', salt='notsomuch'))
         self.session.commit()
-        self.pwm = PWM(config_file=self.tmp_config.name, session=self.session)
+        self.pwm = PWM()
+        self.pwm.bootstrap(self.tmp_db.name)
 
 
     def tearDown(self):
-        os.remove(self.tmp_config.name)
+        os.remove(self.tmp_db.name)
 
 
     def test_get_salt(self):
@@ -60,3 +56,10 @@ class PWMCoreTest(unittest.TestCase):
         # PY26: If we drop support for python 2.6, this can be rewritten to use assertRaises as a
         # context manager, which is better for readability
         self.assertRaises(DuplicateDomainException, self.pwm.create_domain, 'example.com')
+
+
+class PWMNotReadyTest(unittest.TestCase):
+
+    def test_not_ready(self):
+        pwm = PWM()
+        self.assertRaises(NotReadyException, pwm.get_domain, 'example.com')

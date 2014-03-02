@@ -1,6 +1,6 @@
 from . import encoding
 from ._compat import RawConfigParser
-from .exceptions import DuplicateDomainException
+from .exceptions import DuplicateDomainException, NotReadyException
 
 import base64
 import getpass
@@ -70,56 +70,79 @@ class Domain(Base):
         return self.derive_key(master_password)
 
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return 'Domain(name=%s, salt=%s, charset=%s, length=%s)' \
                 % (self.name, self.salt, self.charset, self.encoding_length)
 
 
-class PWM(object):
-    """ This is the main object for interfacing with a pwm database. """
-
-    def __init__(self, config_file=None, session=None):
-        self._read_config(config_file)
-        self.session = session
+def _db_uri_from_path(database_path):
+    """ Get a SQLAlchemy compatible database URI given a path to a file. """
+    return 'sqlite:///%s' % database_path
 
 
-    def _read_config(self, config_file):
-        defaults = {
-            'server-certificate': None,
-            'client-certificate': None,
-            'client-key': None,
-        }
-        config_parser = RawConfigParser(defaults=defaults)
-        config = {}
-        config_parser.read(config_file)
-        config['database'] = config_parser.get('pwm', 'database')
-
-        client_certificate = config_parser.get('pwm', 'client-certificate')
-        client_key = config_parser.get('pwm', 'client-key')
-        if client_certificate and client_key:
-            client_certificate_path = os.path.join(os.path.dirname(config_file), client_certificate)
-            client_key_path = os.path.join(os.path.dirname(config_file), client_key)
-            config['auth'] = (client_certificate_path, client_key_path)
-
-        if config_parser.get('pwm', 'server-certificate'):
-            config['server_certificate'] = os.path.join(os.path.dirname(config_file), config_parser.get('pwm', 'server-certificate'))
-        self.config = config
-
-
-    def search(self, query):
-        """ Search the database for the given query. Will find partial matches. """
+def _uses_db(func):
+    """ Use as a decorator for operations on the database, to ensure connection setup and
+    teardown.
+    """
+    def wrapped_func(self, *args, **kwargs):
         if not self.session:
             self._init_db_session()
+        ret = func(self, *args, **kwargs)
+        try:
+            self.session.commit()
+        except:
+            self.session.rollback()
+            raise
+        finally:
+            self.session.close()
+        return ret
+
+    return wrapped_func
+
+
+class PWM(object):
+    """ This is the main object for interfacing with a pwm database.
+
+    :param database_path: The absolute path to the database to use. If not given or None,
+        :func:`PWM.bootstrap <pwm.core.PWM.bootstrap` must be called before doing any operations
+        that operate on the database. If there's no file at the given path, a new database will be
+        created there.
+    """
+
+    def __init__(self, database_path=None):
+        self.session = None
+        self.database_uri = None
+        if database_path:
+            # Bootstrap a new database if it doesn't exists already
+            self.database_uri = _db_uri_from_path(database_path)
+            if not os.path.exists(database_path):
+                self.bootstrap(database_path)
+
+
+    def bootstrap(self, database_path):
+        """ Initialize a database.
+
+        :param database_path: The absolute path to the database to initialize.
+        """
+        self.database_uri = _db_uri_from_path(database_path)
+        db = sa.create_engine(self.database_uri)
+        Base.metadata.create_all(db)
+
+
+    @_uses_db
+    def search(self, query):
+        """ Search the database for the given query. Will find partial matches. """
         results = self.session.query(Domain).filter(Domain.name.ilike('%%%s%%' % query)).all()
         return results
 
 
+    @_uses_db
     def get_domain(self, domain):
         """ Get the :class:`Domain <pwm.Domain>` object from a name.
 
         :param domain: The domain name to fetch the object for.
         """
-        protocol = self.config['database'].split(':', 1)[0]
+        protocol = self.database_uri.split(':', 1)[0]
         if protocol in ('https', 'http'):
             return self._get_domain_from_rest_api(domain)
         else:
@@ -168,21 +191,26 @@ class PWM(object):
         :param charset: A character set restriction to impose on keys generated for this domain.
         :param length: The length of the generated key, in case of restrictions on the site.
         """
-        full_charset = encoding.lookup_alphabet(charset)
-        domain = Domain(name=domain_name, username=username, encoding_length=length,
-            charset=full_charset)
-        if not self.session:
-            self._init_db_session()
+        # Wrap the actual implementation to do some error handling
         try:
-            self.session.add(domain)
-            self.session.commit()
+            return self._create_domain(domain_name, username, charset, length)
         except Exception as ex:
             _logger.warn("Inserting new domain failed: %s", ex)
             raise DuplicateDomainException
+
+
+    @_uses_db
+    def _create_domain(self, domain_name, username, charset, length):
+        full_charset = encoding.lookup_alphabet(charset)
+        domain = Domain(name=domain_name, username=username, encoding_length=length,
+            charset=full_charset)
+        self.session.add(domain)
         return domain
 
 
     def _init_db_session(self):
-        db = sa.create_engine(self.config['database'])
-        DBSession = sessionmaker(bind=db)
+        if not self.database_uri:
+            raise NotReadyException()
+        db = sa.create_engine(self.database_uri)
+        DBSession = sessionmaker(bind=db, expire_on_commit=False)
         self.session = DBSession()

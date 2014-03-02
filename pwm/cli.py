@@ -1,5 +1,4 @@
 from . import PWM, encoding
-from .core import Base
 from ._compat import HTTPConnection, RawConfigParser, input
 
 import argparse
@@ -7,7 +6,6 @@ import os
 import sys
 import logging.config
 import textwrap
-import sqlalchemy as sa
 
 
 def main():
@@ -99,7 +97,7 @@ def add_search_parser(subparsers):
 
 
 def search(args):
-    pwm = PWM(config_file=args.config_file)
+    pwm = _get_pwm_from_config(args.config_file)
     results = pwm.search(args.query)
     for result in results:
         print(result.name)
@@ -107,7 +105,7 @@ def search(args):
 
 
 def get(args):
-    pwm = PWM(config_file=args.config_file)
+    pwm = _get_pwm_from_config(args.config_file)
     domain = pwm.get_domain(args.domain)
     if domain:
         key = domain.get_key()
@@ -121,7 +119,7 @@ def get(args):
 
 
 def create(args):
-    pwm = PWM(config_file=args.config_file)
+    pwm = _get_pwm_from_config(args.config_file)
     length = args.length
     domain = pwm.create_domain(args.domain, username=args.username, charset=args.charset,
         length=length)
@@ -133,37 +131,57 @@ def create(args):
         return 1
 
 
+def _get_pwm_from_config(config_file):
+    config = _read_config(config_file)
+    pwm = PWM(database_path=config['database'])
+    return pwm
+
+
 def run_setup(config_file):
     if not os.path.exists(os.path.dirname(config_file)):
         os.makedirs(os.path.dirname(config_file))
     print(textwrap.dedent("""\
         Hi, it looks like it's the first time you're using pwm on this machine. Let's take a little
         moment to set things up before we begin."""))
-    db_uri = input('Which database do you want to use (default: local sqlite at ~/.pwm/db.sqlite) ').strip() or 'local'
+    db_uri = input('Which database do you want to use (default: local sqlite at ' +
+        '~/.pwm/db.sqlite) ').strip() or 'local'
     rc_dir = os.path.dirname(config_file)
 
     if db_uri == 'local':
-
-        # normalize windows-style paths for sqlalchemy:
-        rc_dir = rc_dir.replace('\\', '/')
-
-        # Create the local database
-        db_uri = 'sqlite:///%s/db.sqlite' % rc_dir
-    if not '://' in db_uri:
-        # Not a sqlalchemy-compatible connection string or https URI, assume it's a local path and make a sqlite
-        # uri out of it
-        db_uri = 'sqlite:///%s' % db_uri
-    if not (db_uri.startswith('https:') or db_uri.startswith('http:')):
-        # It's a local db, make sure our tables exist
-        db = sa.create_engine(db_uri)
-        Base.metadata.create_all(db)
+        db_path = 'db.sqlite'
+    else:
+        db_path = db_uri
 
     config_parser = RawConfigParser()
     config_parser.add_section('pwm')
-    config_parser.set('pwm', 'database', db_uri)
+    config_parser.set('pwm', 'database', db_path)
 
     with open(config_file, 'w') as config_file_fh:
         config_parser.write(config_file_fh)
+
+
+def _read_config(config_file):
+        defaults = {
+            'server-certificate': None,
+            'client-certificate': None,
+            'client-key': None,
+        }
+        config_parser = RawConfigParser(defaults=defaults)
+        config = {}
+        config_parser.read(config_file)
+        db_path = config_parser.get('pwm', 'database')
+        config['database'] = os.path.join(os.path.dirname(config_file), db_path)
+
+        client_certificate = config_parser.get('pwm', 'client-certificate')
+        client_key = config_parser.get('pwm', 'client-key')
+        if client_certificate and client_key:
+            client_certificate_path = os.path.join(os.path.dirname(config_file), client_certificate)
+            client_key_path = os.path.join(os.path.dirname(config_file), client_key)
+            config['auth'] = (client_certificate_path, client_key_path)
+
+        if config_parser.get('pwm', 'server-certificate'):
+            config['server_certificate'] = os.path.join(os.path.dirname(config_file), config_parser.get('pwm', 'server-certificate'))
+        return config
 
 
 def _init_logging(verbose=False):
