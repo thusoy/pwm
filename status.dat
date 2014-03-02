@@ -37,7 +37,7 @@ p19
 I0
 sS'n_statements'
 p20
-I1
+I2
 sS'n_excluded'
 p21
 I0
@@ -52,7 +52,7 @@ p24
 I0
 sbssS'hash'
 p25
-S'\x93:\x04\xbf\x08A\x15u&\xb6g\x84\x07k\xb9\x13'
+S'h\xccH\xf6"\xa0\x18\xfcm3 \xc7\xf1\x9e\xcb\xdb'
 p26
 ssS'pwm__compat'
 p27
@@ -119,7 +119,7 @@ I0
 sg24
 I0
 sbssg25
-S'?\x13\xd5}\x1d\x166\xc1.v\xe8\xb8kK\x93}'
+S':\xa3\xb0\x1e\xd4\x1dq\xc0\x9b\xcb\xbeh\x10\xa1\xc2\xc5'
 p41
 ssS'pwm_encoding'
 p42
@@ -177,17 +177,17 @@ I1
 sg19
 I24
 sg20
-I112
+I117
 sg21
-I0
+I2
 sg22
-I6
+I3
 sg23
-I33
+I26
 sg24
-I12
+I11
 sbssg25
-S'+R\x86\xa7@\xcd\x82L_\x91\x08\txe\xb2+'
+S'\xf3\x9e79\x17r$\xdf\x9di%\xbaNa}\x87'
 p57
 sssS'version'
 p58
