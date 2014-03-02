@@ -15,6 +15,12 @@ if PY2: # pragma: no cover
     from ConfigParser import RawConfigParser
     from httplib import HTTPConnection
     input = raw_input
-else:
+    def ord_byte(char):
+        ''' convert a single character into integer representation '''
+        return ord(char)
+else: # pragma: no cover
     from configparser import RawConfigParser
     from http.client import HTTPConnection
+    def ord_byte(byte):
+        ''' convert a single byte into integer representation '''
+        return byte

@@ -1,22 +1,10 @@
+from ._compat import ord_byte
+
 import math
 import string
 from logging import getLogger
 
 _logger = getLogger('pwm.encoding')
-
-try:
-    ord(b'1'[0])
-
-    def ord_byte(char):
-        ''' convert a single character into integer representation '''
-        return ord(char)
-
-except TypeError:
-    # python 3
-    def ord_byte(byte):
-        ''' convert a single byte into integer representation '''
-        return byte
-
 
 DEFAULT_CHARSET = 'full'
 DEFAULT_LENGTH = 16
