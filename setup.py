@@ -20,7 +20,7 @@ if sys.version_info < (2, 7, 0):
     install_requires.append('argparse')
 
 extras = {}
-extras['test'] = ['nose', 'coverage']
+extras['test'] = ['nose', 'coverage', 'mock']
 extras['dev'] = extras['test'] + ['tox', 'nosy', 'sphinx']
 
 setup(

@@ -8,11 +8,13 @@ import logging.config
 import textwrap
 
 
-def main():
+def main(args=None):
     """ Main entry point for the CLI. """
-    args = get_args()
     if not _is_configured(args.config_file):
         run_setup(args.config_file)
+    if args is None:
+        args = sys.argv[1:]
+    args = parse_args(args)
     ret_code = args.target(args)
     sys.exit(ret_code)
 
@@ -21,7 +23,7 @@ def _is_configured(config_file):
     return os.path.exists(config_file)
 
 
-def get_args():
+def parse_args(args):
     argparser = argparse.ArgumentParser(prog='pwm')
     argparser.add_argument('-v', '--verbose',
         action='store_true',
@@ -42,8 +44,9 @@ def get_args():
     add_get_parser(subparsers)
     add_search_parser(subparsers)
     add_create_parser(subparsers)
+    add_init_parser(subparsers)
 
-    args = argparser.parse_args()
+    args = argparser.parse_args(args)
     _init_logging(verbose=args.verbose)
     return args
 
