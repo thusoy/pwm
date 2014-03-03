@@ -179,8 +179,6 @@ class PWM(object):
 
 
     def _get_domain_from_db(self, domain_name):
-        if not self.session:
-            self._init_db_session()
         domain = self.session.query(Domain).filter(Domain.name == domain_name).first()
         return domain
 
