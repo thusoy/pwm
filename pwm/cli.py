@@ -1,4 +1,4 @@
-from . import PWM, encoding
+from . import PWM, encoding, Domain
 from ._compat import HTTPConnection, RawConfigParser, input
 
 import argparse
@@ -64,7 +64,7 @@ def add_create_parser(subparsers):
         metavar='<length>',
         help='Set length of generated key. Default: %(default)d',
         type=int,
-        default=encoding.DEFAULT_LENGTH,
+        default=Domain.DEFAULT_KEY_LENGTH,
     )
     parser.add_argument('-c', '--charset',
         metavar='<charset>',
@@ -121,7 +121,7 @@ def get(args):
 def create(args):
     pwm = _get_pwm_from_config(args.config_file)
     length = args.length
-    domain = pwm.create_domain(args.domain, username=args.username, charset=args.charset,
+    domain = pwm.create_domain(args.domain, username=args.username, alphabet=args.charset,
         length=length)
     if domain:
         print('New domain successfully created.')

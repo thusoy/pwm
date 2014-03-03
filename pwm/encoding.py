@@ -6,8 +6,6 @@ from logging import getLogger
 
 _logger = getLogger('pwm.encoding')
 
-DEFAULT_CHARSET = 'full'
-DEFAULT_LENGTH = 16
 # 'full' repeats digits twice, to increase the probablity of a digit appearing in a default 16
 # character password, for sites that suck at estimating entropy and requires digits to be present
 PRESETS = {
@@ -46,7 +44,7 @@ class Encoder(object):
         self.chunklen = calc_chunklen(len(alphabet))
 
 
-    def encode(self, digest, totallen=DEFAULT_LENGTH):
+    def encode(self, digest, total_len):
         binstr = digest.digest()
 
         nchunks = ceildiv(len(binstr), self.chunklen[0])
@@ -54,7 +52,7 @@ class Encoder(object):
 
         return ''.join([
                 self._encode_chunk(binstr, i) for i in range(0, nchunks)
-            ])[:totallen]
+            ])[:total_len]
 
     def _encode_chunk(self, data, index):
         '''

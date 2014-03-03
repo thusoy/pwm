@@ -27,25 +27,26 @@ class Domain(Base):
     in a browser extension of similar.
 
     :param name: The identifier for this domain.
-    :param charset: The characters the key will consist of.
-    :param length: The length of the computed key. Can be useful if the site imposes restrictions
-        on password length.
+    :param alpabet: The alpabet to restrict key contents to. Default: 'full'
+    :param key_length: The length of the computed key. Can be useful if the site imposes restrictions
+        on password length. Default: 16
     """
+    DEFAULT_KEY_LENGTH = 16
+    DEFAULT_ALPHABET = 'full'
+
     __tablename__ = 'domain'
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(30), unique=True)
     salt = sa.Column(sa.String(128))
     charset = sa.Column(sa.String(128))
-    encoding_length = sa.Column(sa.Integer())
+    key_length = sa.Column(sa.Integer())
     username = sa.Column(sa.String(40))
 
 
-    def __init__(self, **kwargs):
-        super(Domain, self).__init__(**kwargs)
-        if not 'encoding_length' in kwargs:
-            self.encoding_length = encoding.DEFAULT_LENGTH
-        if not 'charset' in kwargs:
-            self.charset = encoding.DEFAULT_CHARSET
+    def __init__(self, alphabet=DEFAULT_ALPHABET, key_length=DEFAULT_KEY_LENGTH, **kwargs):
+        if alphabet:
+            self.charset = encoding.lookup_alphabet(alphabet)
+        super(Domain, self).__init__(key_length=key_length, **kwargs)
         if not 'salt' in kwargs:
             self.new_salt()
 
@@ -58,7 +59,7 @@ class Domain(Base):
         """ Computes the key from the salt and the master password. """
         encoder = encoding.Encoder(self.charset)
         bytes = ('%s:%s:%s' % (master_password, self.name, self.salt)).encode('utf8')
-        return encoder.encode(hashlib.sha1(bytes), self.encoding_length)
+        return encoder.encode(hashlib.sha1(bytes), self.key_length)
 
 
     def get_key(self):
@@ -71,8 +72,8 @@ class Domain(Base):
 
 
     def __repr__(self): # pragma: no cover
-        return 'Domain(name=%s, salt=%s, charset=%s, length=%s)' \
-                % (self.name, self.salt, self.charset, self.encoding_length)
+        return 'Domain(name=%s, salt=%s, charset=%s, key_length=%s)' \
+                % (self.name, self.salt, self.charset, self.key_length)
 
 
 def _db_uri_from_path(database_path):
@@ -183,27 +184,26 @@ class PWM(object):
         return domain
 
 
-    def create_domain(self, domain_name, username=None, charset=encoding.DEFAULT_CHARSET,
-            length=encoding.DEFAULT_LENGTH):
+    def create_domain(self, domain_name, username=None, alphabet=Domain.DEFAULT_ALPHABET,
+            length=Domain.DEFAULT_KEY_LENGTH):
         """ Create a new domain entry in the database.
 
         :param username: The username to associate with this domain.
-        :param charset: A character set restriction to impose on keys generated for this domain.
+        :param alphabet: A character set restriction to impose on keys generated for this domain.
         :param length: The length of the generated key, in case of restrictions on the site.
         """
         # Wrap the actual implementation to do some error handling
         try:
-            return self._create_domain(domain_name, username, charset, length)
+            return self._create_domain(domain_name, username, alphabet, length)
         except Exception as ex:
             _logger.warn("Inserting new domain failed: %s", ex)
             raise DuplicateDomainException
 
 
     @_uses_db
-    def _create_domain(self, domain_name, username, charset, length):
-        full_charset = encoding.lookup_alphabet(charset)
-        domain = Domain(name=domain_name, username=username, encoding_length=length,
-            charset=full_charset)
+    def _create_domain(self, domain_name, username, alphabet, length):
+        domain = Domain(name=domain_name, username=username, key_length=length,
+            alphabet=alphabet)
         self.session.add(domain)
         return domain
 

@@ -22,7 +22,5 @@ from .encoding import (
     calc_chunklen,
     Encoder,
     lookup_alphabet,
-    DEFAULT_CHARSET,
-    DEFAULT_LENGTH,
     PRESETS,
 )
