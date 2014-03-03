@@ -9,13 +9,15 @@ import os
 import requests
 import sqlalchemy as sa
 import sys
+import time
+import traceback
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from logging import getLogger
 
 
 Base = declarative_base()
-_logger = getLogger('pwm')
+_logger = getLogger('pwm.core')
 
 
 class Domain(Base):
@@ -66,7 +68,11 @@ class Domain(Base):
         """ Computes the key from the salt and the master password. """
         encoder = encoding.Encoder(self.charset)
         bytes = ('%s:%s:%s' % (master_password, self.name, self.salt)).encode('utf8')
-        return encoder.encode(hashlib.sha1(bytes), self.key_length)
+        start_time = time.clock()
+        key = encoder.encode(hashlib.sha1(bytes), self.key_length)
+        derivation_time_in_s = time.clock() - start_time
+        _logger.debug('Key derivation took %.2fms', derivation_time_in_s*1000)
+        return key
 
 
     def get_key(self):
@@ -90,7 +96,7 @@ def _db_uri_from_path(database_path):
 
 def _uses_db(func):
     """ Use as a decorator for operations on the database, to ensure connection setup and
-    teardown.
+    teardown. Can only be used on methods on objects with a `self.session` attribute.
     """
     def wrapped_func(self, *args, **kwargs):
         if not self.session:
@@ -100,6 +106,8 @@ def _uses_db(func):
             self.session.commit()
         except:
             self.session.rollback()
+            tb = traceback.format_exc()
+            _logger.debug(tb)
             raise
         finally:
             self.session.close()
@@ -125,6 +133,7 @@ class PWM(object):
             self.database_uri = _db_uri_from_path(database_path)
             if not os.path.exists(database_path):
                 self.bootstrap(database_path)
+            _logger.debug('Using database at %s', database_path)
 
 
     def bootstrap(self, database_path):
@@ -132,6 +141,7 @@ class PWM(object):
 
         :param database_path: The absolute path to the database to initialize.
         """
+        _logger.debug("Bootstrapping new database at %s", database_path)
         self.database_uri = _db_uri_from_path(database_path)
         db = sa.create_engine(self.database_uri)
         Base.metadata.create_all(db)
