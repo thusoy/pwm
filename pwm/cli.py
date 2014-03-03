@@ -7,6 +7,16 @@ import sys
 import logging.config
 import textwrap
 
+# The base parser all the other parsers inherit from. Add options here
+# that should work no matter where they are passed
+_BASE_PARSER = argparse.ArgumentParser(
+    add_help=False,
+)
+_BASE_PARSER.add_argument('-v', '--verbose',
+    action='store_true',
+    help='Increase verbosity',
+)
+
 
 def main():
     """ Main entry point for the CLI. """
@@ -22,10 +32,8 @@ def _is_configured(config_file):
 
 
 def get_args():
-    argparser = argparse.ArgumentParser(prog='pwm')
-    argparser.add_argument('-v', '--verbose',
-        action='store_true',
-        help='Increase verbosity',
+    argparser = argparse.ArgumentParser(prog='pwm',
+        parents=[_BASE_PARSER],
     )
     default_config_file = os.path.join(os.path.expanduser('~'), '.pwm', 'config')
     argparser.add_argument('-c', '--config-file',
@@ -52,6 +60,7 @@ def add_create_parser(subparsers):
     parser = subparsers.add_parser('create',
         help='Create keys for a new domain',
         formatter_class=argparse.RawTextHelpFormatter,
+        parents=[_BASE_PARSER],
     )
     parser.add_argument('domain',
         help='The domain to create a key for',
@@ -79,6 +88,7 @@ def add_create_parser(subparsers):
 def add_get_parser(subparsers):
     parser = subparsers.add_parser('get',
         help='Get the key for a domain',
+        parents=[_BASE_PARSER],
     )
     parser.add_argument('domain',
         help='The domain to retrieve the password for',
@@ -89,6 +99,7 @@ def add_get_parser(subparsers):
 def add_search_parser(subparsers):
     parser = subparsers.add_parser('search',
         help='Search for existing domains',
+        parents=[_BASE_PARSER],
     )
     parser.add_argument('query',
         help='The query string to search for',
