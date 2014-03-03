@@ -137,16 +137,18 @@ class PWM(object):
 
 
     @_uses_db
-    def get_domain(self, domain):
+    def get_domain(self, domain_name):
         """ Get the :class:`Domain <pwm.Domain>` object from a name.
 
-        :param domain: The domain name to fetch the object for.
+        :param domain_name: The domain name to fetch the object for.
+        :returns: The :class:`Domain <pwm.core.Domain>` class with this domain_name if found, else
+            None.
         """
         protocol = self.database_uri.split(':', 1)[0]
         if protocol in ('https', 'http'):
-            return self._get_domain_from_rest_api(domain)
+            return self._get_domain_from_rest_api(domain_name)
         else:
-            return self._get_domain_from_db(domain)
+            return self._get_domain_from_db(domain_name)
 
 
     def _get_domain_from_rest_api(self, domain):
