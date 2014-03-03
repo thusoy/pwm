@@ -124,7 +124,7 @@ def create(args):
     domain = pwm.create_domain(args.domain, username=args.username, alphabet=args.charset,
         length=length)
     if domain:
-        print('New domain successfully created.')
+        print('New domain successfully created, key has %d bits of entropy' % domain.entropy)
         print(domain.get_key())
         return 0
     else:

@@ -1,14 +1,14 @@
 from . import encoding
-from ._compat import RawConfigParser
 from .exceptions import DuplicateDomainException, NotReadyException
 
 import base64
 import getpass
 import hashlib
-import requests
+import math
 import os
-import sys
+import requests
 import sqlalchemy as sa
+import sys
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from logging import getLogger
@@ -49,6 +49,13 @@ class Domain(Base):
         super(Domain, self).__init__(key_length=key_length, **kwargs)
         if not 'salt' in kwargs:
             self.new_salt()
+
+
+    @property
+    def entropy(self):
+        unique_chars = len(set(self.charset))
+        entropy = -math.log(1.0/(unique_chars**self.key_length), 2)
+        return entropy
 
 
     def new_salt(self):

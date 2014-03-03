@@ -8,6 +8,25 @@ import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
 
+class DomainTest(unittest.TestCase):
+
+    def test_derive_key(self):
+        domain = Domain(name='example.com', salt='NaCl')
+        expected = 'Ae[GFb=_(o|5uM*)'
+        self.assertEqual(domain.derive_key('secret'), expected)
+
+
+    def test_entropy_measure(self):
+        domain = Domain(charset='01', key_length=1)
+        self.assertEqual(domain.entropy, 1)
+        domain = Domain(charset='1234', key_length=1)
+        self.assertEqual(domain.entropy, 2)
+        domain = Domain(charset='abcd', key_length=2)
+        self.assertEqual(domain.entropy, 4)
+        domain = Domain(charset='aabb', key_length=2)
+        self.assertEqual(domain.entropy, 2)
+
+
 class PWMCoreTest(unittest.TestCase):
 
     def setUp(self):
@@ -29,11 +48,15 @@ class PWMCoreTest(unittest.TestCase):
         os.remove(self.tmp_db.name)
 
 
-    def test_get_salt(self):
-        # sha1 hexdigest of secret:example.com:NaCl
-        expected = 'e7b5038ba1a704e19b8326bc9592329d73ed7351'
-        salt = self.pwm.get_domain('example.com').salt
-        self.assertEqual(salt, 'NaCl')
+    def test_get_domain(self):
+        # test getting existing domain
+        domain = self.pwm.get_domain('example.com')
+        self.assertEqual(domain.salt, 'NaCl')
+        self.assertEqual(domain.name, 'example.com')
+
+        # test nonexisting domain
+        domain = self.pwm.get_domain('neverheardofthis')
+        self.assertIsNone(domain)
 
 
     def test_add_domain(self):
