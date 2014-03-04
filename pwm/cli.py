@@ -6,40 +6,38 @@ import os
 import sys
 import logging.config
 import textwrap
+from logging import getLogger
 
-# The base parser all the other parsers inherit from. Add options here
-# that should work no matter where they are passed
-_BASE_PARSER = argparse.ArgumentParser(
-    add_help=False,
-)
-_BASE_PARSER.add_argument('-v', '--verbose',
+_logger = getLogger('pwm.cli')
+
+# The base parsers the other parsers can inherit from. Add options here
+# that should work no matter where they are passed, like
+# 'pwm -v get facebook' == 'pwm get -v facebook'
+_VERBOSE_PARSER = argparse.ArgumentParser(add_help=False)
+_VERBOSE_PARSER.add_argument('-v', '--verbose',
     action='store_true',
     help='Increase verbosity',
+)
+
+_DB_PARSER = argparse.ArgumentParser(add_help=False)
+_DB_PARSER.add_argument('-d', '--database',
+    metavar='<database>',
+    help='Path to the database to use. Can also be set with the PWM_DATABASE env var. ' +
+        'If neither is set, will fall back to ~/.pwm/db.sqlite',
 )
 
 
 def main():
     """ Main entry point for the CLI. """
     args = get_args()
-    if not _is_configured(args.config_file):
-        run_setup(args.config_file)
     ret_code = args.target(args)
+    _logger.debug('Exiting with code %d', ret_code)
     sys.exit(ret_code)
-
-
-def _is_configured(config_file):
-    return os.path.exists(config_file)
 
 
 def get_args():
     argparser = argparse.ArgumentParser(prog='pwm',
-        parents=[_BASE_PARSER],
-    )
-    default_config_file = os.path.join(os.path.expanduser('~'), '.pwm', 'config')
-    argparser.add_argument('-c', '--config-file',
-        metavar='<config-file>',
-        help='Path to config file to use. Default: %(default)s',
-        default=default_config_file,
+        parents=[_VERBOSE_PARSER, _DB_PARSER],
     )
 
     # Add subparserss
@@ -50,6 +48,7 @@ def get_args():
     add_get_parser(subparsers)
     add_search_parser(subparsers)
     add_create_parser(subparsers)
+    add_init_parser(subparsers)
 
     args = argparser.parse_args()
     _init_logging(verbose=args.verbose)
@@ -60,7 +59,7 @@ def add_create_parser(subparsers):
     parser = subparsers.add_parser('create',
         help='Create keys for a new domain',
         formatter_class=argparse.RawTextHelpFormatter,
-        parents=[_BASE_PARSER],
+        parents=[_VERBOSE_PARSER, _DB_PARSER],
     )
     parser.add_argument('domain',
         help='The domain to create a key for',
@@ -88,7 +87,7 @@ def add_create_parser(subparsers):
 def add_get_parser(subparsers):
     parser = subparsers.add_parser('get',
         help='Get the key for a domain',
-        parents=[_BASE_PARSER],
+        parents=[_VERBOSE_PARSER, _DB_PARSER],
     )
     parser.add_argument('domain',
         help='The domain to retrieve the password for',
@@ -99,7 +98,7 @@ def add_get_parser(subparsers):
 def add_search_parser(subparsers):
     parser = subparsers.add_parser('search',
         help='Search for existing domains',
-        parents=[_BASE_PARSER],
+        parents=[_VERBOSE_PARSER, _DB_PARSER],
     )
     parser.add_argument('query',
         help='The query string to search for',
@@ -107,16 +106,34 @@ def add_search_parser(subparsers):
     parser.set_defaults(target=search)
 
 
+def add_init_parser(subparsers):
+    parser = subparsers.add_parser('init',
+        help='Initialize a new database',
+        parents=[_VERBOSE_PARSER],
+    )
+    parser.add_argument('database',
+        help='The path to the database to initialize',
+    )
+    parser.set_defaults(target=init)
+
+
+def init(args):
+    pwm = PWM()
+    _logger.debug('Initializing database at %s', args.database)
+    pwm.bootstrap(args.database)
+    return 0
+
+
 def search(args):
-    pwm = _get_pwm_from_config(args.config_file)
+    pwm = _get_pwm(args.database)
     results = pwm.search(args.query)
     for result in results:
         print(result.name)
-    return 0 if results else 1
+    return 1
 
 
 def get(args):
-    pwm = _get_pwm_from_config(args.config_file)
+    pwm = _get_pwm(args.database)
     domain = pwm.get_domain(args.domain)
     if domain:
         key = domain.get_key()
@@ -130,7 +147,7 @@ def get(args):
 
 
 def create(args):
-    pwm = _get_pwm_from_config(args.config_file)
+    pwm = _get_pwm(args.database)
     length = args.length
     domain = pwm.create_domain(args.domain, username=args.username, alphabet=args.charset,
         length=length)
@@ -142,57 +159,11 @@ def create(args):
         return 1
 
 
-def _get_pwm_from_config(config_file):
-    config = _read_config(config_file)
-    pwm = PWM(database_path=config['database'])
+def _get_pwm(cli_database):
+    default_database = os.path.join(os.path.expanduser('~'), '.pwm', 'db.sqlite')
+    database = cli_database or os.environ.get('PWM_DATABASE') or default_database
+    pwm = PWM(database_path=database)
     return pwm
-
-
-def run_setup(config_file):
-    if not os.path.exists(os.path.dirname(config_file)):
-        os.makedirs(os.path.dirname(config_file))
-    print(textwrap.dedent("""\
-        Hi, it looks like it's the first time you're using pwm on this machine. Let's take a little
-        moment to set things up before we begin."""))
-    db_uri = input('Which database do you want to use (default: local sqlite at ' +
-        '~/.pwm/db.sqlite) ').strip() or 'local'
-    rc_dir = os.path.dirname(config_file)
-
-    if db_uri == 'local':
-        db_path = 'db.sqlite'
-    else:
-        db_path = db_uri
-
-    config_parser = RawConfigParser()
-    config_parser.add_section('pwm')
-    config_parser.set('pwm', 'database', db_path)
-
-    with open(config_file, 'w') as config_file_fh:
-        config_parser.write(config_file_fh)
-
-
-def _read_config(config_file):
-        defaults = {
-            'server-certificate': None,
-            'client-certificate': None,
-            'client-key': None,
-        }
-        config_parser = RawConfigParser(defaults=defaults)
-        config = {}
-        config_parser.read(config_file)
-        db_path = config_parser.get('pwm', 'database')
-        config['database'] = os.path.join(os.path.dirname(config_file), db_path)
-
-        client_certificate = config_parser.get('pwm', 'client-certificate')
-        client_key = config_parser.get('pwm', 'client-key')
-        if client_certificate and client_key:
-            client_certificate_path = os.path.join(os.path.dirname(config_file), client_certificate)
-            client_key_path = os.path.join(os.path.dirname(config_file), client_key)
-            config['auth'] = (client_certificate_path, client_key_path)
-
-        if config_parser.get('pwm', 'server-certificate'):
-            config['server_certificate'] = os.path.join(os.path.dirname(config_file), config_parser.get('pwm', 'server-certificate'))
-        return config
 
 
 def _init_logging(verbose=False):
