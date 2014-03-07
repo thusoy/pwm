@@ -1,4 +1,4 @@
-from pwm import Domain, PWM, DuplicateDomainException, NotReadyException
+from pwm import Domain, PWM, DuplicateDomainException, NotReadyException, NoSuchDomainException
 from pwm.core import Base
 
 import os
@@ -79,6 +79,19 @@ class PWMCoreTest(unittest.TestCase):
         # PY26: If we drop support for python 2.6, this can be rewritten to use assertRaises as a
         # context manager, which is better for readability
         self.assertRaises(DuplicateDomainException, self.pwm.create_domain, 'example.com')
+
+
+    def test_modify_domain(self):
+        domain = self.pwm.get_domain('example.com')
+        old_key = domain.derive_key('secret')
+        modified_domain = self.pwm.modify_domain('example.com', new_salt=True,
+            username='me@example.com')
+        self.assertNotEqual(old_key, modified_domain.derive_key('secret'))
+        self.assertEqual(modified_domain.username, 'me@example.com')
+
+
+    def test_modify_nonexistent_domain(self):
+        self.assertRaises(NoSuchDomainException, self.pwm.modify_domain, 'neverheardofthis')
 
 
 class PWMNotReadyTest(unittest.TestCase):

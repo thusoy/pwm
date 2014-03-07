@@ -1,5 +1,5 @@
 from . import encoding
-from .exceptions import DuplicateDomainException, NotReadyException
+from .exceptions import DuplicateDomainException, NotReadyException, NoSuchDomainException
 
 import base64
 import getpass
@@ -200,6 +200,26 @@ class PWM(object):
 
     def _get_domain_from_db(self, domain_name):
         domain = self.session.query(Domain).filter(Domain.name == domain_name).first()
+        return domain
+
+
+    @_uses_db
+    def modify_domain(self, domain_name, new_salt=False, username=None):
+        """ Modify an existing domain.
+
+        :param domain_name: The name of the domain to modify.
+        :param new_salt: Whether to generate a new salt for the domain.
+        :param username: If given, change domain username to this value.
+        :returns: The modified :class:`Domain <pwm.core.Domain>` object.
+        """
+        domain = self._get_domain_from_db(domain_name)
+        if domain is None:
+            raise NoSuchDomainException
+        if new_salt:
+            _logger.info("Generating new salt..")
+            domain.new_salt()
+        if username is not None:
+            domain.username = username
         return domain
 
 

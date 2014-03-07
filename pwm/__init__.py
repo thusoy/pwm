@@ -15,6 +15,7 @@ from .core import (
 from .exceptions import (
     DuplicateDomainException,
     NotReadyException,
+    NoSuchDomainException,
 )
 
 from .encoding import (
