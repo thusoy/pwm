@@ -100,9 +100,10 @@ def _uses_db(func):
     """
     def wrapped_func(self, *args, **kwargs):
         if not self.session:
+            _logger.debug('Creating new db session')
             self._init_db_session()
-        ret = func(self, *args, **kwargs)
         try:
+            ret = func(self, *args, **kwargs)
             self.session.commit()
         except:
             self.session.rollback()
@@ -110,6 +111,7 @@ def _uses_db(func):
             _logger.debug(tb)
             raise
         finally:
+            _logger.debug('Closing db session')
             self.session.close()
         return ret
 
