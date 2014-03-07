@@ -1,4 +1,4 @@
-from . import PWM, encoding, Domain
+from . import PWM, encoding, Domain, NoSuchDomainException
 from ._compat import HTTPConnection, RawConfigParser, input
 
 import argparse
@@ -49,6 +49,7 @@ def get_args():
     add_search_parser(subparsers)
     add_create_parser(subparsers)
     add_init_parser(subparsers)
+    add_modify_parser(subparsers)
 
     args = argparser.parse_args()
     _init_logging(verbose=args.verbose)
@@ -93,6 +94,26 @@ def add_get_parser(subparsers):
         help='The domain to retrieve the password for',
     )
     parser.set_defaults(target=get)
+
+
+def add_modify_parser(subparsers):
+    parser = subparsers.add_parser('modify',
+        help='Modify an existing domain',
+        parents=[_VERBOSE_PARSER, _DB_PARSER],
+    )
+    parser.add_argument('domain',
+        help='The domain to modify',
+    )
+    parser.add_argument('-s', '--new-salt',
+        action='store_true',
+        default=False,
+        help='Generate a new salt for this domain. Default: %(default)s',
+    )
+    parser.add_argument('-u', '--username',
+        metavar='<username>',
+        help='Set a new username for this domain',
+    )
+    parser.set_defaults(target=modify)
 
 
 def add_search_parser(subparsers):
@@ -156,6 +177,17 @@ def create(args):
         print(domain.get_key())
         return 0
     else:
+        return 1
+
+
+def modify(args):
+    pwm = _get_pwm(args.database)
+    try:
+        pwm.modify_domain(args.domain, new_salt=args.new_salt, username=args.username)
+        print('Domain updated successfully.')
+        return 0
+    except NoSuchDomainException:
+        print("Couldn't find a domain with this name.")
         return 1
 
 
