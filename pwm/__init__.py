@@ -7,6 +7,8 @@
 """
 # pylint: disable=unused-import
 
+__version__ = '0.1.4'
+
 from .core import (
     Domain,
     PWM,

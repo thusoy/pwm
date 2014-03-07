@@ -1,4 +1,4 @@
-from . import PWM, encoding, Domain, NoSuchDomainException
+from . import PWM, encoding, Domain, NoSuchDomainException, __version__
 from ._compat import HTTPConnection, RawConfigParser, input
 
 import argparse
@@ -38,6 +38,12 @@ def main():
 def get_args():
     argparser = argparse.ArgumentParser(prog='pwm',
         parents=[_VERBOSE_PARSER, _DB_PARSER],
+    )
+
+    argparser.add_argument('-V', '--version',
+        action='version',
+        version=__version__,
+        help='Display version info and quit',
     )
 
     # Add subparserss
