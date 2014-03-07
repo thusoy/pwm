@@ -155,16 +155,16 @@ def search(args):
 
 def get(args):
     pwm = _get_pwm(args.database)
-    domain = pwm.get_domain(args.domain)
-    if domain:
-        key = domain.get_key()
-        if domain.username:
-            print('Username: %s' % domain.username)
-        print(key)
-        return 0
-    else:
+    try:
+        domain = pwm.get_domain(args.domain)
+    except NoSuchDomainException:
         print("Couldn't find any entries for '%s', are you sure you have created any?" % args.domain)
         return 1
+    key = domain.get_key()
+    if domain.username:
+        print('Username: %s' % domain.username)
+    print(key)
+    return 0
 
 
 def create(args):

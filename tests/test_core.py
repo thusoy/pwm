@@ -55,8 +55,7 @@ class PWMCoreTest(unittest.TestCase):
         self.assertEqual(domain.name, 'example.com')
 
         # test nonexisting domain
-        domain = self.pwm.get_domain('neverheardofthis')
-        self.assertEqual(domain, None)
+        self.assertRaises(NoSuchDomainException, self.pwm.get_domain, 'neverheardofthis')
 
 
     def test_add_domain(self):

@@ -167,7 +167,11 @@ class PWM(object):
         if protocol in ('https', 'http'):
             return self._get_domain_from_rest_api(domain_name)
         else:
-            return self._get_domain_from_db(domain_name)
+            domain = self._get_domain_from_db(domain_name)
+            if domain:
+                return domain
+            else:
+                raise NoSuchDomainException
 
 
     def _get_domain_from_rest_api(self, domain):
