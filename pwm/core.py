@@ -2,6 +2,7 @@ from . import encoding
 from .exceptions import DuplicateDomainException, NotReadyException, NoSuchDomainException
 
 import base64
+import decorator
 import getpass
 import hashlib
 import math
@@ -94,28 +95,26 @@ def _db_uri_from_path(database_path):
     return 'sqlite:///%s' % database_path
 
 
-def _uses_db(func):
+@decorator.decorator
+def _uses_db(func, self, *args, **kwargs):
     """ Use as a decorator for operations on the database, to ensure connection setup and
     teardown. Can only be used on methods on objects with a `self.session` attribute.
     """
-    def wrapped_func(self, *args, **kwargs):
-        if not self.session:
-            _logger.debug('Creating new db session')
-            self._init_db_session()
-        try:
-            ret = func(self, *args, **kwargs)
-            self.session.commit()
-        except:
-            self.session.rollback()
-            tb = traceback.format_exc()
-            _logger.debug(tb)
-            raise
-        finally:
-            _logger.debug('Closing db session')
-            self.session.close()
-        return ret
-
-    return wrapped_func
+    if not self.session:
+        _logger.debug('Creating new db session')
+        self._init_db_session()
+    try:
+        ret = func(self, *args, **kwargs)
+        self.session.commit()
+    except:
+        self.session.rollback()
+        tb = traceback.format_exc()
+        _logger.debug(tb)
+        raise
+    finally:
+        _logger.debug('Closing db session')
+        self.session.close()
+    return ret
 
 
 class PWM(object):
