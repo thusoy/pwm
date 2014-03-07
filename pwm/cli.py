@@ -150,7 +150,7 @@ def search(args):
     results = pwm.search(args.query)
     for result in results:
         print(result.name)
-    return 1
+    return 0
 
 
 def get(args):
