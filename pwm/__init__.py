@@ -7,7 +7,7 @@
 """
 # pylint: disable=unused-import
 
-__version__ = '0.1.4'
+__version__ = '0.1.4' # When bumping, also bump version in setup.py
 
 from .core import (
     Domain,
