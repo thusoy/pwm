@@ -16,6 +16,7 @@ install_requires = [
     'decorator',
     'sqlalchemy',
     'requests',
+    'scrypt',
 ]
 
 if sys.version_info < (2, 7, 0):

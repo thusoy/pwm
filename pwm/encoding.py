@@ -45,10 +45,8 @@ class Encoder(object):
 
 
     def encode(self, digest, total_len):
-        binstr = digest.digest()
-
-        nchunks = ceildiv(len(binstr), self.chunklen[0])
-        binstr = binstr.ljust(nchunks * self.chunklen[0], b'\0')
+        nchunks = ceildiv(len(digest), self.chunklen[0])
+        binstr = digest.ljust(nchunks * self.chunklen[0], b'\0')
 
         return ''.join([
                 self._encode_chunk(binstr, i) for i in range(0, nchunks)
