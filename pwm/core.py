@@ -90,9 +90,17 @@ class Domain(Base):
                 % (self.name, self.salt, self.charset, self.key_length)
 
 
-def _db_uri_from_path(database_path):
-    """ Get a SQLAlchemy compatible database URI given a path to a file. """
-    return 'sqlite:///%s' % database_path
+def _urify_db(path_or_uri):
+    """ Get a SQLAlchemy compatible database URI.
+
+    If a path is given, append sqlite:/// in the front, if protocol details are already provided,
+    return unchanged.
+    """
+    if '://' in path_or_uri:
+        return path_or_uri
+    else:
+        return 'sqlite:///%s' % path_or_uri
+
 
 
 @decorator.decorator
@@ -120,30 +128,24 @@ def _uses_db(func, self, *args, **kwargs):
 class PWM(object):
     """ This is the main object for interfacing with a pwm database.
 
-    :param database_path: The absolute path to the database to use. If not given or None,
+    :param database_path: The path to the database to use, or a SQLAlchemy-compatible connection
+        URI, like `postgresql://user:pw@host/db`. If not given or None,
         :func:`PWM.bootstrap <pwm.core.PWM.bootstrap` must be called before doing any operations
-        that operate on the database. If there's no file at the given path, a new database will be
-        created there.
+        that operate on the database.
     """
 
-    def __init__(self, database_path=None):
+    def __init__(self, database_uri=None):
         self.session = None
-        self.database_uri = None
-        if database_path:
-            # Bootstrap a new database if it doesn't exists already
-            self.database_uri = _db_uri_from_path(database_path)
-            if not os.path.exists(database_path):
-                self.bootstrap(database_path)
-            _logger.debug('Using database at %s', database_path)
+        self.database_uri = _urify_db(database_uri) if database_uri else None
 
 
-    def bootstrap(self, database_path):
+    def bootstrap(self, path_or_uri):
         """ Initialize a database.
 
         :param database_path: The absolute path to the database to initialize.
         """
-        _logger.debug("Bootstrapping new database at %s", database_path)
-        self.database_uri = _db_uri_from_path(database_path)
+        _logger.debug("Bootstrapping new database: %s", path_or_uri)
+        self.database_uri = _urify_db(path_or_uri)
         db = sa.create_engine(self.database_uri)
         Base.metadata.create_all(db)
 

@@ -1,5 +1,5 @@
 from pwm import Domain, PWM, DuplicateDomainException, NotReadyException, NoSuchDomainException
-from pwm.core import Base
+from pwm.core import Base, _urify_db
 
 import os
 import tempfile
@@ -98,3 +98,13 @@ class PWMNotReadyTest(unittest.TestCase):
     def test_not_ready(self):
         pwm = PWM()
         self.assertRaises(NotReadyException, pwm.get_domain, 'example.com')
+
+
+class CoreUtilsTest(unittest.TestCase):
+
+    def test_urify_db(self):
+        uri = _urify_db('/tmp/testdb.sqlite')
+        self.assertEqual('sqlite:////tmp/testdb.sqlite', uri)
+
+        uri = _urify_db('mysql://user:pw@localhost/mydb')
+        self.assertEqual('mysql://user:pw@localhost/mydb', uri)
