@@ -1,13 +1,12 @@
 from . import encoding
 from .exceptions import DuplicateDomainException, NotReadyException, NoSuchDomainException
 
-import base64
 import decorator
 import getpass
-import hashlib
 import math
 import os
 import requests
+import scrypt
 import sqlalchemy as sa
 import sys
 import time
@@ -40,7 +39,7 @@ class Domain(Base):
     __tablename__ = 'domain'
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(30), unique=True)
-    salt = sa.Column(sa.String(128))
+    salt = sa.Column(sa.LargeBinary(128))
     charset = sa.Column(sa.String(128))
     key_length = sa.Column(sa.Integer())
     username = sa.Column(sa.String(40))
@@ -62,16 +61,22 @@ class Domain(Base):
 
 
     def new_salt(self):
-        self.salt = base64.b64encode(os.urandom(32))
+        self.salt = os.urandom(32)
 
 
     def derive_key(self, master_password):
         """ Computes the key from the salt and the master password. """
         encoder = encoding.Encoder(self.charset)
-        bytes = ('%s:%s:%s' % (master_password, self.name, self.salt)).encode('utf8')
+
+        bytes = ('%s:%s' % (master_password, self.name)).encode('utf8')
+
         start_time = time.clock()
-        key = encoder.encode(hashlib.sha1(bytes), self.key_length)
+        # we fix the scrypt parameters in case the defaults change
+        digest = scrypt.hash(bytes, self.salt, N=1<<14, r=8, p=1)
+
+        key = encoder.encode(digest, self.key_length)
         derivation_time_in_s = time.clock() - start_time
+
         _logger.debug('Key derivation took %.2fms', derivation_time_in_s*1000)
         return key
 

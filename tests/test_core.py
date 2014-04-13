@@ -11,8 +11,8 @@ from sqlalchemy.orm import sessionmaker
 class DomainTest(unittest.TestCase):
 
     def test_derive_key(self):
-        domain = Domain(name='example.com', salt='NaCl')
-        expected = 'Ae[GFb=_(o|5uM*)'
+        domain = Domain(name='example.com', salt=b'NaCl')
+        expected = '|efhesDIl)/RvB&Q'
         self.assertEqual(domain.derive_key('secret'), expected)
 
 
@@ -36,9 +36,9 @@ class PWMCoreTest(unittest.TestCase):
         Base.metadata.create_all(db)
         DBSession = sessionmaker(bind=db)
         self.session = DBSession()
-        self.session.add(Domain(name='example.com', salt='NaCl'))
-        self.session.add(Domain(name='otherexample.com', salt='supersalty'))
-        self.session.add(Domain(name='facebook.com', salt='notsomuch'))
+        self.session.add(Domain(name='example.com', salt=b'NaCl'))
+        self.session.add(Domain(name='otherexample.com', salt=b'supersalty'))
+        self.session.add(Domain(name='facebook.com', salt=b'notsomuch'))
         self.session.commit()
         self.pwm = PWM()
         self.pwm.bootstrap(self.tmp_db.name)
@@ -51,7 +51,7 @@ class PWMCoreTest(unittest.TestCase):
     def test_get_domain(self):
         # test getting existing domain
         domain = self.pwm.get_domain('example.com')
-        self.assertEqual(domain.salt, 'NaCl')
+        self.assertEqual(domain.salt, b'NaCl')
         self.assertEqual(domain.name, 'example.com')
 
         # test nonexisting domain
